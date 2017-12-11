@@ -1,0 +1,4 @@
+*.o
+gel
+*.cachegrind
+*.callgrind
