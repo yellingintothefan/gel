@@ -14,7 +14,7 @@ CFLAGS = -Wshadow -Wall -Wpedantic -Wextra
 CFLAGS+= -g
 
 # Optimization flags.
-CFLAGS+= -Ofast -march=native -fsingle-precision-constant
+CFLAGS+= -Ofast -flto -march=native -fsingle-precision-constant
 CFLAGS+= -fassociative-math -freciprocal-math -fno-signed-zeros
 CFLAGS+= -frename-registers -funroll-loops -fno-trapping-math
 
