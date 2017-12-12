@@ -1,6 +1,8 @@
 #include "Faces.h"
 
-Faces fsnew(const int max)
+#include "util.h"
+
+Faces xfsnew(const int max)
 {
     Faces fs = { 0, 0, 0 };
     fs.face = xutoss(Face, max);
@@ -8,12 +10,12 @@ Faces fsnew(const int max)
     return fs;
 }
 
-int fscheck(const char* const line)
+static int fscheck(const char* const line)
 {
     return line[0] == 'f';
 }
 
-Face fparse(const char* const line)
+static Face fsparse(const char* const line)
 {
     Face face;
     xuzero(face);
@@ -27,9 +29,19 @@ Face fparse(const char* const line)
     return face;
 }
 
-Faces fsload(FILE* const file)
+static Face fsindex(const Face f)
 {
-    Faces fs = fsnew(1024);
+    const Face face = {{
+        f.vertex[0] - 1,
+            f.vertex[1] - 1,
+            f.vertex[2] - 1,
+    }};
+    return face;
+}
+
+Faces xfsload(FILE* const file)
+{
+    Faces fs = xfsnew(1024);
     const int lines = xulns(file);
     for(int i = 0; i < lines; i++)
     {
@@ -40,7 +52,7 @@ Faces fsload(FILE* const file)
             if(fs.count == fs.max)
                 xuretoss(fs.face, Face, fs.max *= 2);
             // Appending.
-            fs.face[fs.count++] = zindex(fparse(line));
+            fs.face[fs.count++] = fsindex(fsparse(line));
         }
         free(line);
     }
@@ -48,7 +60,7 @@ Faces fsload(FILE* const file)
     return fs;
 }
 
-void fskill(const Faces fs)
+void xfskill(const Faces fs)
 {
     free(fs.face);
 }

@@ -1,6 +1,8 @@
 #include "Vertices.h"
 
-Vertices vsnew(const int max)
+#include "util.h"
+
+Vertices xvsnew(const int max)
 {
     Vertices v;
     xuzero(v);
@@ -9,21 +11,21 @@ Vertices vsnew(const int max)
     return v;
 }
 
-int vscheck(const char* const line)
+static int vscheck(const char* const line)
 {
     return line[0] == 'v' && line[1] != 't' && line[1] != 'n';
 }
 
-Vertex vparse(const char* const line)
+static Vertex vparse(const char* const line)
 {
     Vertex v = { 0.0, 0.0, 0.0 };
     sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
     return v;
 }
 
-Vertices vsload(FILE* const file)
+Vertices xvsload(FILE* const file)
 {
-    Vertices v = vsnew(1024); /* Arbitrary size. */
+    Vertices v = xvsnew(1024); /* Arbitrary size. */
     const int lines = xulns(file);
     for(int i = 0; i < lines; i++)
     {
@@ -42,8 +44,7 @@ Vertices vsload(FILE* const file)
     return v;
 }
 
-void vskill(const Vertices v)
+void xvskill(const Vertices v)
 {
     free(v.vertex);
 }
-

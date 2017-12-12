@@ -1,5 +1,6 @@
 #include "util.h"
 
+#include <stdarg.h>
 #include <stdlib.h>
 
 uint32_t xushade(const float brightness)
@@ -38,4 +39,13 @@ char* xureadln(FILE* const file)
     }
     line[reads] = '\0';
     return line;
+}
+
+void xubomb(const char* const message, ...)
+{
+    va_list args;
+    va_start(args, message);
+    vprintf(message, args);
+    va_end(args);
+    exit(1);
 }

@@ -1,6 +1,8 @@
 #include "Sdl.h"
 
-void schurn(const Sdl sdl)
+#include "util.h"
+
+void xschurn(const Sdl sdl)
 {
     const SDL_Rect dst = {
         (sdl.xres - sdl.yres) / 2,
@@ -10,12 +12,12 @@ void schurn(const Sdl sdl)
     SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
 }
 
-void spresent(const Sdl sdl)
+void xspresent(const Sdl sdl)
 {
     SDL_RenderPresent(sdl.renderer);
 }
 
-Sdl ssetup(const int xres, const int yres)
+Sdl xssetup(const int xres, const int yres)
 {
     SDL_Init(SDL_INIT_VIDEO);
     Sdl sdl;
@@ -29,7 +31,7 @@ Sdl ssetup(const int xres, const int yres)
     return sdl;
 }
 
-void srelease(const Sdl sdl)
+void xsrelease(const Sdl sdl)
 {
     SDL_DestroyTexture(sdl.canvas);
     SDL_Quit();
@@ -37,17 +39,7 @@ void srelease(const Sdl sdl)
     SDL_DestroyRenderer(sdl.renderer);
 }
 
-void sunlock(const Sdl sdl)
+void xsunlock(const Sdl sdl)
 {
     SDL_UnlockTexture(sdl.canvas);
-}
-
-Display slock(const Sdl sdl)
-{
-    void* screen;
-    int pitch;
-    SDL_LockTexture(sdl.canvas, NULL, &screen, &pitch);
-    const int width = pitch / sizeof(uint32_t);
-    const Display display = { (uint32_t*) screen, width };
-    return display;
 }

@@ -1,13 +1,16 @@
 #include "Triangle.h"
 
-int tinside(const Triangle t, const Point p)
+#include "Line.h"
+#include "util.h"
+
+int xtinside(const Triangle t, const Point p)
 {
     const Line a = { t.a, t.b }, b = { t.b, t.c }, c = { t.c, t.a };
-    return (lcross(a, p) > 0.0 && lcross(b, p) > 0.0 && lcross(c, p) > 0.0)
-        || (lcross(a, p) < 0.0 && lcross(b, p) < 0.0 && lcross(c, p) < 0.0);
+    return (xlcross(a, p) > 0.0 && xlcross(b, p) > 0.0 && xlcross(c, p) > 0.0)
+        || (xlcross(a, p) < 0.0 && xlcross(b, p) < 0.0 && xlcross(c, p) < 0.0);
 }
 
-Line tenclose(const Triangle t)
+Line xtenclose(const Triangle t)
 {
     const Line line = {
         { xumin(t.a.x, xumin(t.b.x, t.c.x)), xumin(t.a.y, xumin(t.b.y, t.c.y)) },
@@ -16,7 +19,7 @@ Line tenclose(const Triangle t)
     return line;
 }
 
-Triangle tscale(const Triangle t, const int xres, const int yres)
+Triangle xtscale(const Triangle t, const int xres, const int yres)
 {
     const Triangle triangle = {
         { (xres / 2) * (t.a.x + 1.0), (yres / 2) * (t.a.y + 1.0) },

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 
 #define xutoss(t, n) ((t*) malloc((n) * sizeof(t)))
 
@@ -17,3 +20,5 @@ int xulns(FILE* const file);
 char* xureadln(FILE* const file);
 
 uint32_t xushade(const float brightness);
+
+void xubomb(const char* const message, ...);
