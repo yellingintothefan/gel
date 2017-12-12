@@ -1,4 +1,5 @@
 *.o
+*.d
 gel
 *.cachegrind
 *.callgrind

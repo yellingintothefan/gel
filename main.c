@@ -1,20 +1,78 @@
 #include <SDL2/SDL.h>
 #include <time.h>
 
-#define xtoss(t, n)\
-    ((t*) malloc((n) * sizeof(t)))
+typedef struct
+{
+    float x, y;
+}
+Point;
 
-#define xretoss(ptr, t, n)\
-    (ptr = (t*) realloc((ptr), (n) * sizeof(t)))
+typedef struct
+{
+    Point a, b;
+}
+Line;
 
-#define xzero(a)\
-    (memset(&(a), 0, sizeof(a)))
+typedef struct
+{
+    Point a, b, c;
+}
+Triangle;
 
-#define xmax(a, b)\
-    (((a) > (b)) ? (a) : (b))
+typedef struct
+{
+    float x, y, z;
+}
+Vertex;
 
-#define xmin(a, b)\
-    (((a) < (b)) ? (a) : (b))
+typedef struct
+{
+    Vertex* vertex;
+    int count;
+    int max;
+}
+Vertices;
+
+typedef struct
+{
+    int vertex[3];
+}
+Face;
+
+typedef struct
+{
+    Face* face;
+    int count;
+    int max;
+}
+Faces;
+
+typedef struct
+{
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    SDL_Texture* canvas;
+    int xres;
+    int yres;
+}
+Sdl;
+
+typedef struct
+{
+    uint32_t* pixels;
+    int width;
+}
+Display;
+
+#define xtoss(t, n) ((t*) malloc((n) * sizeof(t)))
+
+#define xretoss(ptr, t, n) (ptr = (t*) realloc((ptr), (n) * sizeof(t)))
+
+#define xzero(a) (memset(&(a), 0, sizeof(a)))
+
+#define xmax(a, b) (((a) > (b)) ? (a) : (b))
+
+#define xmin(a, b) (((a) < (b)) ? (a) : (b))
 
 int lns(FILE* const file)
 {
@@ -45,16 +103,6 @@ char* readln(FILE* const file)
     line[reads] = '\0';
     return line;
 }
-
-typedef struct
-{
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-    SDL_Texture* canvas;
-    int xres;
-    int yres;
-}
-Sdl;
 
 void schurn(const Sdl sdl)
 {
@@ -102,13 +150,6 @@ void sunlock(const Sdl sdl)
     SDL_UnlockTexture(sdl.canvas);
 }
 
-typedef struct
-{
-    uint32_t* pixels;
-    int width;
-}
-Display;
-
 Display slock(const Sdl sdl)
 {
     void* screen;
@@ -119,28 +160,10 @@ Display slock(const Sdl sdl)
     return display;
 }
 
-typedef struct
-{
-    float x, y;
-}
-Point;
-
-typedef struct
-{
-    Point a, b;
-}
-Line;
-
 float lcross(const Line l, const Point p)
 {
     return (l.b.x - l.a.x) * (p.y - l.a.y) - (l.b.y - l.a.y) * (p.x - l.a.x);
 }
-
-typedef struct
-{
-    Point a, b, c;
-}
-Triangle;
 
 int tinside(const Triangle t, const Point p)
 {
@@ -169,20 +192,6 @@ void dtriangle(const Display d, const Triangle t, const uint32_t color)
         if(tinside(t, p)) d.pixels[i + j * d.width] = color;
     }
 }
-
-typedef struct
-{
-    float x, y, z;
-}
-Vertex;
-
-typedef struct
-{
-    Vertex* vertex;
-    int count;
-    int max;
-}
-Vertices;
 
 Vertices vsnew(const int max)
 {
@@ -230,20 +239,6 @@ void vskill(const Vertices v)
 {
     free(v.vertex);
 }
-
-typedef struct
-{
-    int vertex[3];
-}
-Face;
-
-typedef struct
-{
-    Face* face;
-    int count;
-    int max;
-}
-Faces;
 
 Faces fsnew(const int max)
 {
