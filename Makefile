@@ -5,16 +5,7 @@ CC = gcc -std=c99
 PROJ = gel
 
 # Source files.
-SRCS =main.c
-SRCS+=Display.c
-SRCS+=Face.c
-SRCS+=Faces.c
-SRCS+=Line.c
-SRCS+=Sdl.c
-SRCS+=Triangle.c
-SRCS+=Vertex.c
-SRCS+=Vertices.c
-SRCS+=util.c
+SRCS = main.c
 
 # Warnings flags.
 CFLAGS = -Wshadow -Wall -Wpedantic -Wextra

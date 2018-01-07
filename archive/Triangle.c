@@ -5,7 +5,9 @@
 
 int xtinside(const Triangle t, const Point p)
 {
-    const Line a = { t.a, t.b }, b = { t.b, t.c }, c = { t.c, t.a };
+    const Line a = { t.a, t.b };
+    const Line b = { t.b, t.c };
+    const Line c = { t.c, t.a };
     return (xlcross(a, p) > 0.0 && xlcross(b, p) > 0.0 && xlcross(c, p) > 0.0)
         || (xlcross(a, p) < 0.0 && xlcross(b, p) < 0.0 && xlcross(c, p) < 0.0);
 }
