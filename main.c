@@ -118,15 +118,6 @@ static char* ureadln(FILE* const file)
     return line;
 }
 
-static void ubomb(const char* const message, ...)
-{
-    va_list args;
-    va_start(args, message);
-    vprintf(message, args);
-    va_end(args);
-    exit(1);
-}
-
 static Vertices vsnew(const int max)
 {
     Vertices vs;
@@ -143,9 +134,7 @@ static Vertices vsload(FILE* const file)
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
-        if(line[0] == 'v'
-        && line[1] != 't'
-        && line[1] != 'n')
+        if(line[0] == 'v' && line[1] != 't' && line[1] != 'n')
         {
             if(vs.count == vs.max)
                 uretoss(vs.vertex, Vertex, vs.max *= 2);
@@ -187,11 +176,7 @@ Faces fsload(FILE* const file)
                 &f.va, &waste, &waste,
                 &f.vb, &waste, &waste,
                 &f.vc, &waste, &waste);
-            const Face indexed = {
-                f.va - 1,
-                f.vb - 1,
-                f.vc - 1,
-            };
+            const Face indexed = { f.va - 1, f.vb - 1, f.vc - 1 };
             fs.face[fs.count++] = indexed;
         }
         free(line);
@@ -222,8 +207,7 @@ void schurn(const Sdl sdl)
         (sdl.yres - sdl.xres) / 2,
         sdl.yres, sdl.xres
     };
-    SDL_RenderCopyEx(
-        sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
 }
 
 void spresent(const Sdl sdl)
@@ -236,12 +220,10 @@ Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     Sdl sdl;
     uzero(sdl);
-    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN); //| SDL_WINDOW_FULLSCREEN);
+    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
-    sdl.canvas = SDL_CreateTexture(
-        sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-        // Notice the flip in xres and yres. This is for widescreen.
-        yres, xres);
+    // Notice the flip in xres and yres. This is for widescreen.
+    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
     SDL_SetRelativeMouseMode(SDL_FALSE);
@@ -276,11 +258,12 @@ Triangle tviewport(const Triangle t, const Sdl sdl)
     return v;
 }
 
-Triangle tpersp(const Triangle t)
+Triangle tperspective(const Triangle t)
 {
-    const float za = 1.0 - t.a.z / 3.0;
-    const float zb = 1.0 - t.b.z / 3.0;
-    const float zc = 1.0 - t.c.z / 3.0;
+    const float c = 3.0;
+    const float za = 1.0 - t.a.z / c;
+    const float zb = 1.0 - t.b.z / c;
+    const float zc = 1.0 - t.c.z / c;
     const Triangle p = {
         { t.a.x / za, t.a.y / za, t.a.z },
         { t.b.x / zb, t.b.y / zb, t.b.z },
@@ -289,49 +272,57 @@ Triangle tpersp(const Triangle t)
     return p;
 }
 
-float vmag(const Vertex v)
-{
-    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-}
-
-Vertex vsub(const Vertex a, const Vertex b)
+// Vector subtraction.
+Vertex vs(const Vertex a, const Vertex b)
 {
     const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
     return v;
 }
 
-Vertex vcross(const Vertex a, const Vertex b)
+// Vector cross product.
+Vertex vc(const Vertex a, const Vertex b)
 {
-    const Vertex c = {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
+    const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
     return c;
 }
 
-float vdot(const Vertex a, const Vertex b)
+// Vector dot product.
+float vd(const Vertex a, const Vertex b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-Vertex vmul(const Vertex v, const float n)
+// Vector scalar multiplication.
+Vertex vm(const Vertex v, const float n)
 {
     const Vertex m = { v.x * n, v.y * n, v.z * n };
     return m;
 }
 
+// Vector length.
+float vl(const Vertex v)
+{
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+// Vector unit.
+Vertex vu(const Vertex v)
+{
+    return vm(v, 1.0 / vl(v));
+}
+
+// Triangle barycentric coordinates.
 Vertex tbc(const Triangle t, const int x, const int y)
 {
     const Vertex p = { x, y, 0.0 };
-    const Vertex v0 = vsub(t.b, t.a);
-    const Vertex v1 = vsub(t.c, t.a);
-    const Vertex v2 = vsub(p, t.a);
-    const float d00 = vdot(v0, v0);
-    const float d01 = vdot(v0, v1);
-    const float d11 = vdot(v1, v1);
-    const float d20 = vdot(v2, v0);
-    const float d21 = vdot(v2, v1);
+    const Vertex v0 = vs(t.b, t.a);
+    const Vertex v1 = vs(t.c, t.a);
+    const Vertex v2 = vs(p, t.a);
+    const float d00 = vd(v0, v0);
+    const float d01 = vd(v0, v1);
+    const float d11 = vd(v1, v1);
+    const float d20 = vd(v2, v0);
+    const float d21 = vd(v2, v1);
     const float v = (d11 * d20 - d01 * d21) / (d00 * d11 - d01 * d01);
     const float w = (d00 * d21 - d01 * d20) / (d00 * d11 - d01 * d01);
     const float u = 1.0 - v - w;
@@ -339,20 +330,10 @@ Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-Vertex tnormal(const Triangle t)
+// Triangle normal.
+Vertex tnm(const Triangle t)
 {
-    return vcross(vsub(t.b, t.a), vsub(t.c, t.a));
-}
-
-Box bcompute(const Triangle t)
-{
-    const Box box = {
-        umin(t.a.x, umin(t.b.x, t.c.x)),
-        umin(t.a.y, umin(t.b.y, t.c.y)),
-        umax(t.a.x, umax(t.b.x, t.c.x)),
-        umax(t.a.y, umax(t.b.y, t.c.y)),
-    };
-    return box;
+    return vc(vs(t.b, t.a), vs(t.c, t.a));
 }
 
 float zget(const Triangle t, const Vertex bc)
@@ -367,7 +348,12 @@ int vinside(const Vertex bc)
 
 void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int color)
 {
-    const Box b = bcompute(t);
+    const Box b = {
+        umin(t.a.x, umin(t.b.x, t.c.x)),
+        umin(t.a.y, umin(t.b.y, t.c.y)),
+        umax(t.a.x, umax(t.b.x, t.c.x)),
+        umax(t.a.y, umax(t.b.y, t.c.y)),
+    };
     for(int y = b.y0; y <= b.y1; y++)
     for(int x = b.x0; x <= b.x1; x++)
     {
@@ -385,11 +371,6 @@ void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int c
     }
 }
 
-Vertex vunit(const Vertex v)
-{
-    return vmul(v, 1.0 / vmag(v));
-}
-
 Zbuff znew(const int xres, const int yres)
 {
     const int size = xres * yres;
@@ -401,26 +382,56 @@ Zbuff znew(const int xres, const int yres)
 
 Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
 {
-    const Vertex z = vunit(vsub(eye, center));
-    const Vertex x = vunit(vcross(up, z));
-    const Vertex y = vcross(z, x);
-    const Triangle l = {{
-        t.a.x * x.x + t.a.y * x.y + t.a.z * x.z - vdot(x, eye),
-        t.a.x * y.x + t.a.y * y.y + t.a.z * y.z - vdot(y, eye),
-        t.a.x * z.x + t.a.y * z.y + t.a.z * z.z - vdot(z, eye)},{
-        t.b.x * x.x + t.b.y * x.y + t.b.z * x.z - vdot(x, eye),
-        t.b.x * y.x + t.b.y * y.y + t.b.z * y.z - vdot(y, eye),
-        t.b.x * z.x + t.b.y * z.y + t.b.z * z.z - vdot(z, eye)},{
-        t.c.x * x.x + t.c.y * x.y + t.c.z * x.z - vdot(x, eye),
-        t.c.x * y.x + t.c.y * y.y + t.c.z * y.z - vdot(y, eye),
-        t.c.x * z.x + t.c.y * z.y + t.c.z * z.z - vdot(z, eye),
-    }};
+    const Vertex z = vu(vs(eye, center));
+    const Vertex x = vu(vc(up, z));
+    const Vertex y = vc(z, x);
+    const float xe = vd(x, eye);
+    const float ye = vd(y, eye);
+    const float ze = vd(z, eye);
+    const Triangle l = {
+        { t.a.x * x.x + t.a.y * x.y + t.a.z * x.z - xe, t.a.x * y.x + t.a.y * y.y + t.a.z * y.z - ye, t.a.x * z.x + t.a.y * z.y + t.a.z * z.z - ze },
+        { t.b.x * x.x + t.b.y * x.y + t.b.z * x.z - xe, t.b.x * y.x + t.b.y * y.y + t.b.z * y.z - ye, t.b.x * z.x + t.b.y * z.y + t.b.z * z.z - ze },
+        { t.c.x * x.x + t.c.y * x.y + t.c.z * x.z - xe, t.c.x * y.x + t.c.y * y.y + t.c.z * y.z - ye, t.c.x * z.x + t.c.y * z.y + t.c.z * z.z - ze },
+    };
     return l;
 }
 
 void dfill(const Display d, const Sdl sdl)
 {
-    for(int x = 0; x < sdl.xres * sdl.yres; x++) d.pixel[x] = 0x0;
+    for(int x = 0; x < sdl.xres * sdl.yres; x++)
+        d.pixel[x] = 0x0;
+}
+
+typedef struct
+{
+    float xt;
+    float yt;
+    float sens;
+    const uint8_t* key;
+}
+Input;
+
+Input iinit()
+{
+    const Input input = { 0.0, 0.0, 0.001, SDL_GetKeyboardState(NULL) };
+    return input;
+}
+
+Input ipump(Input input)
+{
+    int dx;
+    int dy;
+    SDL_PumpEvents();
+    SDL_GetRelativeMouseState(&dx, &dy);
+    input.xt -= input.sens * dx;
+    input.yt += input.sens * dy;
+    return input;
+}
+
+Vertex ieye(const Input input)
+{
+    const Vertex e = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
+    return e;
 }
 
 int main()
@@ -430,7 +441,10 @@ int main()
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
-        ubomb("could not open %s\n", path);
+    {
+        printf("could not open %s\n", path);
+        exit(1);
+    }
     const Vertices vs = vsload(file);
     const Faces fs = fsload(file);
     const Triangles ts = tsgen(vs, fs);
@@ -438,52 +452,28 @@ int main()
     const Vertex lights = { 0.0, 0.0, 1.0 };
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
-    const uint8_t* key = SDL_GetKeyboardState(NULL);
-    float xt = 0.0;
-    float yt = 0.0;
-    const float sensitivity = 0.001;
-    for(int cycles = 0; !key[SDL_SCANCODE_END]; cycles++)
+    Input input = iinit();
+    for(int cycles = 0; !input.key[SDL_SCANCODE_END]; cycles++)
     {
-        SDL_PumpEvents();
-        int dx;
-        int dy;
-        SDL_GetRelativeMouseState(&dx, &dy);
-        xt -= sensitivity * dx;
-        yt += sensitivity * dy;
-        const float z = cosf(xt);
-        const float x = sinf(xt);
-        const float y = sinf(yt);
-        Vertex eye = { x, y, z };
+        input = ipump(input);
+        const Vertex eye = ieye(input);
         const Display d = dlock(sdl);
         dfill(d, sdl);
-        /* Triangle Pipeline */
         const Zbuff zbuff = znew(xres, yres);
         for(int i = 0; i < ts.count; i++)
         {
             const Triangle t = ts.triangle[i];
             const Triangle m = tlookat(t, eye, center, upward);
-            const Triangle p = tpersp(m);
+            const Triangle p = tperspective(m);
             const Triangle v = tviewport(p, sdl);
-            const float brightness = vdot(vunit(tnormal(p)), lights);
+            const float brightness = vd(vu(tnm(p)), lights);
+            const float shade = 0x0000FF * brightness;
             if(brightness > 0.0)
-                dtriangle(d, v, zbuff, 0x0000FF * fabs(brightness));
+                dtriangle(d, v, zbuff, shade);
         }
         free(zbuff.z);
         sunlock(sdl);
         schurn(sdl);
         spresent(sdl);
     }
-    /*
-     * Let the OS cleanup for fast exit.
-     */
-    #if 0
-    SDL_DestroyTexture(sdl.canvas);
-    SDL_DestroyWindow(sdl.window);
-    SDL_DestroyRenderer(sdl.renderer);
-    SDL_Quit();
-    free(ts.triangle);
-    free(vs.vertex);
-    free(fs.face);
-    fclose(file);
-    #endif
 }
