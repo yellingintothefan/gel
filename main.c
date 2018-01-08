@@ -236,7 +236,7 @@ Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     Sdl sdl;
     uzero(sdl);
-    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN);
+    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN); //| SDL_WINDOW_FULLSCREEN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
     sdl.canvas = SDL_CreateTexture(
         sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
@@ -244,7 +244,7 @@ Sdl ssetup(const int xres, const int yres)
         yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_FALSE);
     return sdl;
 }
 
@@ -425,8 +425,8 @@ void dfill(const Display d, const Sdl sdl)
 
 int main()
 {
-    const int xres = 1024;
-    const int yres = 768;
+    const int xres = 800;
+    const int yres = 600;
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
