@@ -18,9 +18,7 @@
 
 typedef struct
 {
-    float x;
-    float y;
-    float z;
+    float x, y, z;
 }
 Vertex;
 
@@ -34,7 +32,7 @@ Vertices;
 
 typedef struct
 {
-    int vertex[3];
+    int va, vb, vc;
 }
 Face;
 
@@ -48,9 +46,7 @@ Faces;
 
 typedef struct
 {
-    Vertex a;
-    Vertex b;
-    Vertex c;
+    Vertex a, b, c;
 }
 Triangle;
 
@@ -73,7 +69,7 @@ Sdl;
 
 typedef struct
 {
-    uint32_t* pixels;
+    uint32_t* pixel;
     int width;
 }
 Display;
@@ -82,9 +78,14 @@ typedef struct
 {
     float* z;
     int xres;
-    int yres;
 }
 Zbuff;
+
+typedef struct
+{
+    int x0, y0, x1, y1;
+}
+Box;
 
 static int ulns(FILE* const file)
 {
@@ -146,10 +147,8 @@ static Vertices vsload(FILE* const file)
         && line[1] != 't'
         && line[1] != 'n')
         {
-            // Growing.
             if(vs.count == vs.max)
                 uretoss(vs.vertex, Vertex, vs.max *= 2);
-            // Appending.
             Vertex v;
             sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
             vs.vertex[vs.count++] = v;
@@ -178,23 +177,21 @@ Faces fsload(FILE* const file)
         char* line = ureadln(file);
         if(line[0] == 'f')
         {
-            // Growing.
             if(fs.count == fs.max)
                 uretoss(fs.face, Face, fs.max *= 2);
-            // Appending.
             int waste;
             Face f;
             sscanf(
                 line,
                 "f %d/%d/%d %d/%d/%d %d/%d/%d",
-                &f.vertex[0], &waste, &waste,
-                &f.vertex[1], &waste, &waste,
-                &f.vertex[2], &waste, &waste);
-            const Face indexed = {{
-                f.vertex[0] - 1,
-                f.vertex[1] - 1,
-                f.vertex[2] - 1,
-            }};
+                &f.va, &waste, &waste,
+                &f.vb, &waste, &waste,
+                &f.vc, &waste, &waste);
+            const Face indexed = {
+                f.va - 1,
+                f.vb - 1,
+                f.vc - 1,
+            };
             fs.face[fs.count++] = indexed;
         }
         free(line);
@@ -209,9 +206,9 @@ Triangles tsgen(const Vertices vs, const Faces fs)
     for(int i = 0; i < fs.count; i++)
     {
         const Triangle t = {
-            vs.vertex[fs.face[i].vertex[0]],
-            vs.vertex[fs.face[i].vertex[1]],
-            vs.vertex[fs.face[i].vertex[2]],
+            vs.vertex[fs.face[i].va],
+            vs.vertex[fs.face[i].vb],
+            vs.vertex[fs.face[i].vc],
         };
         ts.triangle[i] = t;
     }
@@ -225,7 +222,8 @@ void schurn(const Sdl sdl)
         (sdl.yres - sdl.xres) / 2,
         sdl.yres, sdl.xres
     };
-    SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(
+        sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
 }
 
 void spresent(const Sdl sdl)
@@ -238,12 +236,15 @@ Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     Sdl sdl;
     uzero(sdl);
-    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
+    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
-    // Notice the flip in xres and yres. This is for widescreen.
-    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
+    sdl.canvas = SDL_CreateTexture(
+        sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+        // Notice the flip in xres and yres. This is for widescreen.
+        yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
+    SDL_SetRelativeMouseMode(SDL_TRUE);
     return sdl;
 }
 
@@ -262,14 +263,30 @@ Display dlock(const Sdl sdl)
     return display;
 }
 
-Triangle tscale(const Triangle t, const Sdl sdl)
+Triangle tviewport(const Triangle t, const Sdl sdl)
 {
-    const Triangle triangle = {
-        { (sdl.xres / 2) * (t.a.x + 1.0), (sdl.yres / 2) * (t.a.y + 1.0), 0 },
-        { (sdl.xres / 2) * (t.b.x + 1.0), (sdl.yres / 2) * (t.b.y + 1.0), 0 },
-        { (sdl.xres / 2) * (t.c.x + 1.0), (sdl.yres / 2) * (t.c.y + 1.0), 0 },
+    const float w = sdl.xres / 2.0;
+    const float h = sdl.yres / 2.0;
+    const float z = 1.0 / 2.0;
+    const Triangle v = {
+        { w * (t.a.x + 1.0), h * (t.a.y + 1.0), z * (t.a.z + 1.0) },
+        { w * (t.b.x + 1.0), h * (t.b.y + 1.0), z * (t.b.z + 1.0) },
+        { w * (t.c.x + 1.0), h * (t.c.y + 1.0), z * (t.c.z + 1.0) },
     };
-    return triangle;
+    return v;
+}
+
+Triangle tpersp(const Triangle t)
+{
+    const float za = 1.0 - t.a.z / 3.0;
+    const float zb = 1.0 - t.b.z / 3.0;
+    const float zc = 1.0 - t.c.z / 3.0;
+    const Triangle p = {
+        { t.a.x / za, t.a.y / za, t.a.z },
+        { t.b.x / zb, t.b.y / zb, t.b.z },
+        { t.c.x / zc, t.c.y / zc, t.c.z },
+    };
+    return p;
 }
 
 float vmag(const Vertex v)
@@ -279,11 +296,7 @@ float vmag(const Vertex v)
 
 Vertex vsub(const Vertex a, const Vertex b)
 {
-    const Vertex v = {
-        a.x - b.x,
-        a.y - b.y,
-        a.z - b.z,
-    };
+    const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
     return v;
 }
 
@@ -331,29 +344,48 @@ Vertex tnormal(const Triangle t)
     return vcross(vsub(t.b, t.a), vsub(t.c, t.a));
 }
 
+Box bcompute(const Triangle t)
+{
+    const Box box = {
+        umin(t.a.x, umin(t.b.x, t.c.x)),
+        umin(t.a.y, umin(t.b.y, t.c.y)),
+        umax(t.a.x, umax(t.b.x, t.c.x)),
+        umax(t.a.y, umax(t.b.y, t.c.y)),
+    };
+    return box;
+}
+
+float zget(const Triangle t, const Vertex bc)
+{
+    return bc.x * t.a.z + bc.y * t.b.z + bc.z * t.c.z;
+}
+
+int vinside(const Vertex bc)
+{
+    return bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0;
+}
+
 void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int color)
 {
-    const int x0 = umin(t.a.x, umin(t.b.x, t.c.x));
-    const int y0 = umin(t.a.y, umin(t.b.y, t.c.y));
-    const int x1 = umax(t.a.x, umax(t.b.x, t.c.x));
-    const int y1 = umax(t.a.y, umax(t.b.y, t.c.y));
-    for(int y = x0; y <= x1; y++)
-    for(int x = y0; x <= y1; x++)
+    const Box b = bcompute(t);
+    for(int y = b.y0; y <= b.y1; y++)
+    for(int x = b.x0; x <= b.x1; x++)
     {
-        const Vertex bc = tbc(t, y, x); // Notice the flip between x and y.
-        if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
+        const Vertex bc = tbc(t, x, y);
+        if(vinside(bc))
         {
-            const float z = bc.x * t.a.z + bc.y * t.b.z + bc.z * t.c.z;
-            if(z < zbuff.z[y + x * zbuff.xres]) // Notice the flip between x and y.
+            const float z = zget(t, bc);
+            // Notice the flip between x and y.
+            if(z > zbuff.z[y + x * zbuff.xres])
             {
-                zbuff.z[y + x * zbuff.xres] = z; // Notice the flip between x and y.
-                d.pixels[x + y * d.width] = color;
+                zbuff.z[y + x * zbuff.xres] = z;
+                d.pixel[y + x * d.width] = color;
             }
         }
     }
 }
 
-Vertex vnormalized(const Vertex v)
+Vertex vunit(const Vertex v)
 {
     return vmul(v, 1.0 / vmag(v));
 }
@@ -361,16 +393,40 @@ Vertex vnormalized(const Vertex v)
 Zbuff znew(const int xres, const int yres)
 {
     const int size = xres * yres;
-    Zbuff zbuff = { utoss(float, size), xres, yres };
+    Zbuff zbuff = { utoss(float, size), yres };
     for(int i = 0; i < size; i++)
-        zbuff.z[i] = INFINITY;
+        zbuff.z[i] = -FLT_MAX;
     return zbuff;
+}
+
+Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
+{
+    const Vertex z = vunit(vsub(eye, center));
+    const Vertex x = vunit(vcross(up, z));
+    const Vertex y = vcross(z, x);
+    const Triangle l = {{
+        t.a.x * x.x + t.a.y * x.y + t.a.z * x.z - vdot(x, eye),
+        t.a.x * y.x + t.a.y * y.y + t.a.z * y.z - vdot(y, eye),
+        t.a.x * z.x + t.a.y * z.y + t.a.z * z.z - vdot(z, eye)},{
+        t.b.x * x.x + t.b.y * x.y + t.b.z * x.z - vdot(x, eye),
+        t.b.x * y.x + t.b.y * y.y + t.b.z * y.z - vdot(y, eye),
+        t.b.x * z.x + t.b.y * z.y + t.b.z * z.z - vdot(z, eye)},{
+        t.c.x * x.x + t.c.y * x.y + t.c.z * x.z - vdot(x, eye),
+        t.c.x * y.x + t.c.y * y.y + t.c.z * y.z - vdot(y, eye),
+        t.c.x * z.x + t.c.y * z.y + t.c.z * z.z - vdot(z, eye),
+    }};
+    return l;
+}
+
+void dfill(const Display d, const Sdl sdl)
+{
+    for(int x = 0; x < sdl.xres * sdl.yres; x++) d.pixel[x] = 0x0;
 }
 
 int main()
 {
-    const int xres = 800;
-    const int yres = 600;
+    const int xres = 1024;
+    const int yres = 768;
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
@@ -379,32 +435,55 @@ int main()
     const Faces fs = fsload(file);
     const Triangles ts = tsgen(vs, fs);
     const Sdl sdl = ssetup(xres, yres);
-    const Vertex light = { 0.0, 0.0, 1.0 };
-    const Zbuff zbuff = znew(xres, yres);
-    for(int cycles = 0; cycles < 120; cycles++)
+    const Vertex lights = { 0.0, 0.0, 1.0 };
+    const Vertex center = { 0.0, 0.0, 0.0 };
+    const Vertex upward = { 0.0, 1.0, 0.0 };
+    const uint8_t* key = SDL_GetKeyboardState(NULL);
+    float xt = 0.0;
+    float yt = 0.0;
+    const float sensitivity = 0.001;
+    for(int cycles = 0; !key[SDL_SCANCODE_END]; cycles++)
     {
+        SDL_PumpEvents();
+        int dx;
+        int dy;
+        SDL_GetRelativeMouseState(&dx, &dy);
+        xt -= sensitivity * dx;
+        yt += sensitivity * dy;
+        const float z = cosf(xt);
+        const float x = sinf(xt);
+        const float y = sinf(yt);
+        Vertex eye = { x, y, z };
         const Display d = dlock(sdl);
+        dfill(d, sdl);
+        /* Triangle Pipeline */
+        const Zbuff zbuff = znew(xres, yres);
         for(int i = 0; i < ts.count; i++)
         {
-            const Triangle triangle = ts.triangle[i];
-            const Triangle scaled = tscale(triangle, sdl);
-            const Vertex normal = vnormalized(tnormal(triangle));
-            const float brightness = vdot(normal, light);
+            const Triangle t = ts.triangle[i];
+            const Triangle m = tlookat(t, eye, center, upward);
+            const Triangle p = tpersp(m);
+            const Triangle v = tviewport(p, sdl);
+            const float brightness = vdot(vunit(tnormal(p)), lights);
             if(brightness > 0.0)
-                dtriangle(d, scaled, zbuff, 0x0000FF * fabs(brightness));
+                dtriangle(d, v, zbuff, 0x0000FF * fabs(brightness));
         }
+        free(zbuff.z);
         sunlock(sdl);
         schurn(sdl);
         spresent(sdl);
-        printf("%d\n", cycles);
     }
+    /*
+     * Let the OS cleanup for fast exit.
+     */
+    #if 0
     SDL_DestroyTexture(sdl.canvas);
     SDL_DestroyWindow(sdl.window);
     SDL_DestroyRenderer(sdl.renderer);
     SDL_Quit();
-    free(zbuff.z);
     free(ts.triangle);
     free(vs.vertex);
     free(fs.face);
     fclose(file);
+    #endif
 }
