@@ -59,20 +59,6 @@ Sdl;
 
 typedef struct
 {
-    uint32_t* pixel;
-    int width;
-}
-Display;
-
-typedef struct
-{
-    float* z;
-    int xres;
-}
-Zbuff;
-
-typedef struct
-{
     int x0, y0, x1, y1;
 }
 Box;
@@ -228,14 +214,12 @@ static void sunlock(const Sdl sdl)
     SDL_UnlockTexture(sdl.canvas);
 }
 
-static Display dlock(const Sdl sdl)
+static uint32_t* slock(const Sdl sdl)
 {
-    void* screen;
+    void* pixel;
     int pitch;
-    SDL_LockTexture(sdl.canvas, NULL, &screen, &pitch);
-    const int width = pitch / sizeof(uint32_t);
-    const Display display = { (uint32_t*) screen, width };
-    return display;
+    SDL_LockTexture(sdl.canvas, NULL, &pixel, &pitch);
+    return (uint32_t*) pixel;
 }
 
 static Triangle tviewport(const Triangle t, const Sdl sdl)
@@ -265,49 +249,49 @@ static Triangle tperspective(const Triangle t)
     return p;
 }
 
-/* Vector subtraction */
+// Vector subtraction.
 static Vertex vs(const Vertex a, const Vertex b)
 {
     const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
     return v;
 }
 
-/* Vector cross product */
+// Vector cross product.
 static Vertex vc(const Vertex a, const Vertex b)
 {
     const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
     return c;
 }
 
-/* Vector scalar multiplication */
+// Vector scalar multiplication.
 static Vertex vm(const Vertex v, const float n)
 {
     const Vertex m = { v.x * n, v.y * n, v.z * n };
     return m;
 }
 
-/* Vector dot product */
+// Vector dot product.
 static float vd(const Vertex a, const Vertex b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-/* Vector length */
+// Vector length.
 static float vl(const Vertex v)
 {
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-/* Vector unit */
+// Vector unit.
 static Vertex vu(const Vertex v)
 {
     return vm(v, 1.0 / vl(v));
 }
 
-/* Triangle barycentric coordinates */
+// Triangle barycentric coordinates.
 static Vertex tbc(const Triangle t, const int x, const int y)
 {
-    const Vertex p = { x, y, 0.0 };
+    const Vertex p = { (float) x, (float) y, 0.0 };
     const Vertex v0 = vs(t.b, t.a);
     const Vertex v1 = vs(t.c, t.a);
     const Vertex v2 = vs(p, t.a);
@@ -323,7 +307,7 @@ static Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-/* Triangle normal */
+// Triangle normal.
 static Vertex tnm(const Triangle t)
 {
     return vc(vs(t.b, t.a), vs(t.c, t.a));
@@ -339,51 +323,32 @@ static int vinside(const Vertex bc)
     return bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0;
 }
 
-static float max(const float a, const float b)
-{
-    return a > b ? a : b;
-}
-
-static float min(const float a, const float b)
-{
-    return a < b ? a : b;
-}
-
-static void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int color)
+static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float* const zbuff, const int shade)
 {
     const Box b = {
-        min(t.a.x, min(t.b.x, t.c.x)),
-        min(t.a.y, min(t.b.y, t.c.y)),
-        max(t.a.x, max(t.b.x, t.c.x)),
-        max(t.a.y, max(t.b.y, t.c.y)),
+        (int) fminf(t.a.x, fminf(t.b.x, t.c.x)),
+        (int) fminf(t.a.y, fminf(t.b.y, t.c.y)),
+        (int) fmaxf(t.a.x, fmaxf(t.b.x, t.c.x)),
+        (int) fmaxf(t.a.y, fmaxf(t.b.y, t.c.y)),
     };
-    for(int y = b.y0; y <= b.y1; y++)
     for(int x = b.x0; x <= b.x1; x++)
+    for(int y = b.y0; y <= b.y1; y++)
     {
         const Vertex bc = tbc(t, x, y);
         if(vinside(bc))
         {
             const float z = zget(t, bc);
-            // Notice the flip between x and y.
-            if(z > zbuff.z[y + x * zbuff.xres])
+            // Remember that the canvas is rotated 90 degrees so the x and y are flipped here.
+            if(z > zbuff[y + x * yres])
             {
-                zbuff.z[y + x * zbuff.xres] = z;
-                d.pixel[y + x * d.width] = color;
+                zbuff[y + x * yres] = z;
+                pixel[y + x * yres] = shade;
             }
         }
     }
 }
 
-static Zbuff znew(const int xres, const int yres)
-{
-    const int size = xres * yres;
-    Zbuff zbuff = { (float*) malloc(sizeof(float) * size), yres };
-    for(int i = 0; i < size; i++)
-        zbuff.z[i] = -FLT_MAX;
-    return zbuff;
-}
-
-static Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
+static Triangle tview(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
 {
     const Vertex z = vu(vs(eye, center));
     const Vertex x = vu(vc(up, z));
@@ -408,8 +373,7 @@ static Input iinit()
 
 static Input ipump(Input input)
 {
-    int dx;
-    int dy;
+    int dx, dy;
     SDL_PumpEvents();
     SDL_GetRelativeMouseState(&dx, &dy);
     input.xt -= input.sens * dx;
@@ -423,6 +387,14 @@ static Vertex ieye(const Input input)
     return e;
 }
 
+static void reset(float* const zbuff, uint32_t* const pixel, const int size)
+{
+    for(int i = 0; i < size; i++)
+        zbuff[i] = -FLT_MAX;
+    for(int i = 0; i < size; i++)
+        pixel[i] = 0x0;
+}
+
 int main()
 {
     const int xres = 800;
@@ -430,10 +402,7 @@ int main()
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
-    {
         printf("could not open %s\n", path);
-        exit(1);
-    }
     const Vertices vs = vsload(file);
     const Faces fs = fsload(file);
     const Triangles ts = tsgen(vs, fs);
@@ -441,30 +410,28 @@ int main()
     const Vertex lights = { 0.0, 0.0, 1.0 };
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
+    const int size = xres * yres;
+    float* const zbuff = (float*) malloc(sizeof(float) * size);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
+        uint32_t* const pixel = slock(sdl);
+        reset(zbuff, pixel, size);
         const Vertex eye = ieye(input);
-        const Display d = dlock(sdl);
-        for(int x = 0; x < sdl.xres * sdl.yres; x++)
-            d.pixel[x] = 0x0;
-        const Zbuff zbuff = znew(xres, yres);
         for(int i = 0; i < ts.count; i++)
         {
             const Triangle t = ts.triangle[i];
-            const Triangle m = tlookat(t, eye, center, upward);
+            const Triangle m = tview(t, eye, center, upward);
             const Triangle p = tperspective(m);
             const Triangle v = tviewport(p, sdl);
             const float brightness = vd(vu(tnm(p)), lights);
             const float shade = 0x0000FF * brightness;
+            // Back face culling will not render the hidden triangles.
             if(brightness > 0.0)
-                dtriangle(d, v, zbuff, shade);
+                tdraw(yres, pixel, v, zbuff, shade);
         }
-        free(zbuff.z);
         sunlock(sdl);
         schurn(sdl);
         spresent(sdl);
-        break;
     }
+    // Theres no need to cleanup - the OS will do so and give us a quit exit.
 }
-
-// 269,216,930
