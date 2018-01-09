@@ -348,7 +348,7 @@ static Triangle tview(const Triangle t, const Vertex eye, const Vertex center, c
 
 static Input iinit()
 {
-    const Input input = { 0.0, 0.0, 0.001, SDL_GetKeyboardState(NULL) };
+    const Input input = { 0.0, 0.0, 0.005, SDL_GetKeyboardState(NULL) };
     SDL_SetRelativeMouseMode(SDL_FALSE);
     return input;
 }
