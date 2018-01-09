@@ -6,16 +6,6 @@
 #include <math.h>
 #include <SDL2/SDL.h>
 
-#define utoss(t, n) ((t*) malloc((n) * sizeof(t)))
-
-#define uretoss(ptr, t, n) (ptr = (t*) realloc((ptr), (n) * sizeof(t)))
-
-#define uzero(a) (memset(&(a), 0, sizeof(a)))
-
-#define umax(a, b) (((a) > (b)) ? (a) : (b))
-
-#define umin(a, b) (((a) < (b)) ? (a) : (b))
-
 typedef struct
 {
     float x, y, z;
@@ -87,6 +77,15 @@ typedef struct
 }
 Box;
 
+typedef struct
+{
+    float xt;
+    float yt;
+    float sens;
+    const uint8_t* key;
+}
+Input;
+
 static int ulns(FILE* const file)
 {
     int ch = EOF;
@@ -107,12 +106,12 @@ static char* ureadln(FILE* const file)
     int ch = EOF;
     int reads = 0;
     int size = 128;
-    char* line = utoss(char, size);;
+    char* line = (char*) malloc(sizeof(char) * size);
     while((ch = getc(file)) != '\n' && ch != EOF)
     {
         line[reads++] = ch;
         if(reads + 1 == size)
-            uretoss(line, char, size *= 2);
+            line = (char*) realloc(line, sizeof(char) * (size *= 2));
     }
     line[reads] = '\0';
     return line;
@@ -120,10 +119,7 @@ static char* ureadln(FILE* const file)
 
 static Vertices vsnew(const int max)
 {
-    Vertices vs;
-    uzero(vs);
-    vs.vertex = utoss(Vertex, max);
-    vs.max = max;
+    const Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
     return vs;
 }
 
@@ -137,7 +133,7 @@ static Vertices vsload(FILE* const file)
         if(line[0] == 'v' && line[1] != 't' && line[1] != 'n')
         {
             if(vs.count == vs.max)
-                uretoss(vs.vertex, Vertex, vs.max *= 2);
+                vs.vertex = (Vertex*) realloc(vs.vertex, sizeof(Vertex) * (vs.max *= 2));
             Vertex v;
             sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
             vs.vertex[vs.count++] = v;
@@ -148,16 +144,13 @@ static Vertices vsload(FILE* const file)
     return vs;
 }
 
-Faces fsnew(const int max)
+static Faces fsnew(const int max)
 {
-    Faces fs;
-    uzero(fs);
-    fs.face = utoss(Face, max);
-    fs.max = max;
+    const Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
     return fs;
 }
 
-Faces fsload(FILE* const file)
+static Faces fsload(FILE* const file)
 {
     Faces fs = fsnew(128);
     const int lines = ulns(file);
@@ -167,7 +160,7 @@ Faces fsload(FILE* const file)
         if(line[0] == 'f')
         {
             if(fs.count == fs.max)
-                uretoss(fs.face, Face, fs.max *= 2);
+                fs.face = (Face*) realloc(fs.face, sizeof(Face) * (fs.max *= 2));
             int waste;
             Face f;
             sscanf(
@@ -185,9 +178,9 @@ Faces fsload(FILE* const file)
     return fs;
 }
 
-Triangles tsgen(const Vertices vs, const Faces fs)
+static Triangles tsgen(const Vertices vs, const Faces fs)
 {
-    const Triangles ts = { utoss(Triangle, fs.count), fs.count };
+    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * fs.count), fs.count };
     for(int i = 0; i < fs.count; i++)
     {
         const Triangle t = {
@@ -200,7 +193,12 @@ Triangles tsgen(const Vertices vs, const Faces fs)
     return ts;
 }
 
-void schurn(const Sdl sdl)
+static void spresent(const Sdl sdl)
+{
+    SDL_RenderPresent(sdl.renderer);
+}
+
+static void schurn(const Sdl sdl)
 {
     const SDL_Rect dst = {
         (sdl.xres - sdl.yres) / 2,
@@ -210,32 +208,27 @@ void schurn(const Sdl sdl)
     SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
 }
 
-void spresent(const Sdl sdl)
+static Sdl ssetup(const int xres, const int yres)
 {
-    SDL_RenderPresent(sdl.renderer);
-}
-
-Sdl ssetup(const int xres, const int yres)
-{
-    SDL_Init(SDL_INIT_VIDEO);
     Sdl sdl;
-    uzero(sdl);
+    SDL_Init(SDL_INIT_VIDEO);
     sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
-    // Notice the flip in xres and yres. This is for widescreen.
+    // To improve CPU line drawing cache speed the xres and yres for the painting canvas is reversed.
+    // This offsets the canvas by 90 degrees. When the finished canvas frame is presented it will be
+    // quickly rotated 90 degrees by the GPU. See: schurn(Sdl)
     sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
-    SDL_SetRelativeMouseMode(SDL_FALSE);
     return sdl;
 }
 
-void sunlock(const Sdl sdl)
+static void sunlock(const Sdl sdl)
 {
     SDL_UnlockTexture(sdl.canvas);
 }
 
-Display dlock(const Sdl sdl)
+static Display dlock(const Sdl sdl)
 {
     void* screen;
     int pitch;
@@ -245,7 +238,7 @@ Display dlock(const Sdl sdl)
     return display;
 }
 
-Triangle tviewport(const Triangle t, const Sdl sdl)
+static Triangle tviewport(const Triangle t, const Sdl sdl)
 {
     const float w = sdl.xres / 2.0;
     const float h = sdl.yres / 2.0;
@@ -258,7 +251,7 @@ Triangle tviewport(const Triangle t, const Sdl sdl)
     return v;
 }
 
-Triangle tperspective(const Triangle t)
+static Triangle tperspective(const Triangle t)
 {
     const float c = 3.0;
     const float za = 1.0 - t.a.z / c;
@@ -272,47 +265,47 @@ Triangle tperspective(const Triangle t)
     return p;
 }
 
-// Vector subtraction.
-Vertex vs(const Vertex a, const Vertex b)
+/* Vector subtraction */
+static Vertex vs(const Vertex a, const Vertex b)
 {
     const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
     return v;
 }
 
-// Vector cross product.
-Vertex vc(const Vertex a, const Vertex b)
+/* Vector cross product */
+static Vertex vc(const Vertex a, const Vertex b)
 {
     const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
     return c;
 }
 
-// Vector dot product.
-float vd(const Vertex a, const Vertex b)
-{
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-// Vector scalar multiplication.
-Vertex vm(const Vertex v, const float n)
+/* Vector scalar multiplication */
+static Vertex vm(const Vertex v, const float n)
 {
     const Vertex m = { v.x * n, v.y * n, v.z * n };
     return m;
 }
 
-// Vector length.
-float vl(const Vertex v)
+/* Vector dot product */
+static float vd(const Vertex a, const Vertex b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+/* Vector length */
+static float vl(const Vertex v)
 {
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-// Vector unit.
-Vertex vu(const Vertex v)
+/* Vector unit */
+static Vertex vu(const Vertex v)
 {
     return vm(v, 1.0 / vl(v));
 }
 
-// Triangle barycentric coordinates.
-Vertex tbc(const Triangle t, const int x, const int y)
+/* Triangle barycentric coordinates */
+static Vertex tbc(const Triangle t, const int x, const int y)
 {
     const Vertex p = { x, y, 0.0 };
     const Vertex v0 = vs(t.b, t.a);
@@ -330,29 +323,39 @@ Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-// Triangle normal.
-Vertex tnm(const Triangle t)
+/* Triangle normal */
+static Vertex tnm(const Triangle t)
 {
     return vc(vs(t.b, t.a), vs(t.c, t.a));
 }
 
-float zget(const Triangle t, const Vertex bc)
+static float zget(const Triangle t, const Vertex bc)
 {
     return bc.x * t.a.z + bc.y * t.b.z + bc.z * t.c.z;
 }
 
-int vinside(const Vertex bc)
+static int vinside(const Vertex bc)
 {
     return bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0;
 }
 
-void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int color)
+static float max(const float a, const float b)
+{
+    return a > b ? a : b;
+}
+
+static float min(const float a, const float b)
+{
+    return a < b ? a : b;
+}
+
+static void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int color)
 {
     const Box b = {
-        umin(t.a.x, umin(t.b.x, t.c.x)),
-        umin(t.a.y, umin(t.b.y, t.c.y)),
-        umax(t.a.x, umax(t.b.x, t.c.x)),
-        umax(t.a.y, umax(t.b.y, t.c.y)),
+        min(t.a.x, min(t.b.x, t.c.x)),
+        min(t.a.y, min(t.b.y, t.c.y)),
+        max(t.a.x, max(t.b.x, t.c.x)),
+        max(t.a.y, max(t.b.y, t.c.y)),
     };
     for(int y = b.y0; y <= b.y1; y++)
     for(int x = b.x0; x <= b.x1; x++)
@@ -371,16 +374,16 @@ void dtriangle(const Display d, const Triangle t, const Zbuff zbuff, const int c
     }
 }
 
-Zbuff znew(const int xres, const int yres)
+static Zbuff znew(const int xres, const int yres)
 {
     const int size = xres * yres;
-    Zbuff zbuff = { utoss(float, size), yres };
+    Zbuff zbuff = { (float*) malloc(sizeof(float) * size), yres };
     for(int i = 0; i < size; i++)
         zbuff.z[i] = -FLT_MAX;
     return zbuff;
 }
 
-Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
+static Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
 {
     const Vertex z = vu(vs(eye, center));
     const Vertex x = vu(vc(up, z));
@@ -396,28 +399,14 @@ Triangle tlookat(const Triangle t, const Vertex eye, const Vertex center, const 
     return l;
 }
 
-void dfill(const Display d, const Sdl sdl)
-{
-    for(int x = 0; x < sdl.xres * sdl.yres; x++)
-        d.pixel[x] = 0x0;
-}
-
-typedef struct
-{
-    float xt;
-    float yt;
-    float sens;
-    const uint8_t* key;
-}
-Input;
-
-Input iinit()
+static Input iinit()
 {
     const Input input = { 0.0, 0.0, 0.001, SDL_GetKeyboardState(NULL) };
+    SDL_SetRelativeMouseMode(SDL_FALSE);
     return input;
 }
 
-Input ipump(Input input)
+static Input ipump(Input input)
 {
     int dx;
     int dy;
@@ -428,7 +417,7 @@ Input ipump(Input input)
     return input;
 }
 
-Vertex ieye(const Input input)
+static Vertex ieye(const Input input)
 {
     const Vertex e = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
     return e;
@@ -452,13 +441,12 @@ int main()
     const Vertex lights = { 0.0, 0.0, 1.0 };
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
-    Input input = iinit();
-    for(int cycles = 0; !input.key[SDL_SCANCODE_END]; cycles++)
+    for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
-        input = ipump(input);
         const Vertex eye = ieye(input);
         const Display d = dlock(sdl);
-        dfill(d, sdl);
+        for(int x = 0; x < sdl.xres * sdl.yres; x++)
+            d.pixel[x] = 0x0;
         const Zbuff zbuff = znew(xres, yres);
         for(int i = 0; i < ts.count; i++)
         {
@@ -475,5 +463,8 @@ int main()
         sunlock(sdl);
         schurn(sdl);
         spresent(sdl);
+        break;
     }
 }
+
+// 269,216,930
