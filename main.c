@@ -1,9 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <math.h>
 #include <SDL2/SDL.h>
 
 typedef struct
@@ -103,16 +97,10 @@ static char* ureadln(FILE* const file)
     return line;
 }
 
-static Vertices vsnew(const int max)
+static Vertices vsload(FILE* const file, const int lines)
 {
-    const Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
-    return vs;
-}
-
-static Vertices vsload(FILE* const file)
-{
-    Vertices vs = vsnew(128);
-    const int lines = ulns(file);
+    const int max = 128;
+    Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
@@ -130,16 +118,10 @@ static Vertices vsload(FILE* const file)
     return vs;
 }
 
-static Faces fsnew(const int max)
+static Faces fsload(FILE* const file, const int lines)
 {
-    const Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
-    return fs;
-}
-
-static Faces fsload(FILE* const file)
-{
-    Faces fs = fsnew(128);
-    const int lines = ulns(file);
+    const int max = 128;
+    Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
@@ -403,19 +385,19 @@ int main()
     FILE* const file = fopen(path, "r");
     if(!file)
         printf("could not open %s\n", path);
-    const Vertices vs = vsload(file);
-    const Faces fs = fsload(file);
+    const int lines = ulns(file);
+    const Vertices vs = vsload(file, lines);
+    const Faces fs = fsload(file, lines);
     const Triangles ts = tsgen(vs, fs);
     const Sdl sdl = ssetup(xres, yres);
-    const Vertex lights = { 0.0, 0.0, 1.0 };
+    const Vertex lights = { 0.0, 0.0, 1.0 }; // Must not change as backface culling relies on direction.
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
-    const int size = xres * yres;
-    float* const zbuff = (float*) malloc(sizeof(float) * size);
+    float* const zbuff = (float*) malloc(sizeof(float) * xres * yres);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
         uint32_t* const pixel = slock(sdl);
-        reset(zbuff, pixel, size);
+        reset(zbuff, pixel, xres * yres);
         const Vertex eye = ieye(input);
         for(int i = 0; i < ts.count; i++)
         {
@@ -433,5 +415,5 @@ int main()
         schurn(sdl);
         spresent(sdl);
     }
-    // Theres no need to cleanup - the OS will do so and give us a quit exit.
+    // Theres no need to cleanup - the OS will do so and give us a quick exit.
 }
