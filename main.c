@@ -404,15 +404,19 @@ static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float
     }
 }
 
+// To rotate and translate normals, do the inverse, then the transpose, of this view matrix.
 static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
 {
     const Vertex z = vu(vs(e, c));
     const Vertex x = vu(vc(u, z));
     const Vertex y = vc(z, x);
+    const float xe = vd(x, e);
+    const float ye = vd(y, e);
+    const float ze = vd(z, e);
     const Triangle l = {
-        { vd(t.a, x) - vd(x, e), vd(t.a, y) - vd(y, e), vd(t.a, z) - vd(z, e), },
-        { vd(t.b, x) - vd(x, e), vd(t.b, y) - vd(y, e), vd(t.b, z) - vd(z, e), },
-        { vd(t.c, x) - vd(x, e), vd(t.c, y) - vd(y, e), vd(t.c, z) - vd(z, e), },
+        { vd(t.a, x) - xe, vd(t.a, y) - ye, vd(t.a, z) - ze },
+        { vd(t.b, x) - xe, vd(t.b, y) - ye, vd(t.b, z) - ze },
+        { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
     };
     return l;
 }
