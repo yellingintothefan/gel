@@ -119,10 +119,15 @@ static Vertices vsload(FILE* const file, const int lines)
     return vs;
 }
 
+static Vertices vsnew(const int max)
+{
+    const Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
+    return vs;
+}
+
 static Vertices vnload(FILE* const file, const int lines)
 {
-    const int max = 128;
-    Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
+    Vertices vs = vsnew(128);
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
@@ -140,10 +145,15 @@ static Vertices vnload(FILE* const file, const int lines)
     return vs;
 }
 
+static Faces fsnew(const int max)
+{
+    const Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
+    return fs;
+}
+
 static Faces fsload(FILE* const file, const int lines)
 {
-    const int max = 128;
-    Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
+    Faces fs = fsnew(128);
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
@@ -171,10 +181,16 @@ static Faces fsload(FILE* const file, const int lines)
     return fs;
 }
 
+Triangles tsnew(const int count)
+{
+    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * count), count };
+    return ts;
+}
+
 static Triangles tsgen(const Vertices vs, const Faces fs)
 {
-    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * fs.count), fs.count };
-    for(int i = 0; i < fs.count; i++)
+    Triangles ts = tsnew(fs.count);
+    for(int i = 0; i < ts.count; i++)
     {
         const Triangle t = {
             vs.vertex[fs.face[i].va],
@@ -188,7 +204,7 @@ static Triangles tsgen(const Vertices vs, const Faces fs)
 
 static Triangles tngen(const Vertices vs, const Faces fs)
 {
-    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * fs.count), fs.count };
+    Triangles ts = tsnew(fs.count);
     for(int i = 0; i < fs.count; i++)
     {
         const Triangle t = {
@@ -225,8 +241,7 @@ static Sdl ssetup(const int xres, const int yres)
     // To improve CPU line drawing cache speed the xres and yres for the painting canvas is reversed.
     // This offsets the canvas by 90 degrees. When the finished canvas frame is presented it will be
     // quickly rotated 90 degrees by the GPU. See: schurn(Sdl)
-    sdl.canvas = SDL_CreateTexture(sdl.renderer,
-        SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
+    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
     return sdl;
@@ -265,9 +280,9 @@ static Triangle tperspective(const Triangle t)
     const float zb = 1.0 - t.b.z / c;
     const float zc = 1.0 - t.c.z / c;
     const Triangle p = {
-        { t.a.x / za, t.a.y / za, t.a.z },
-        { t.b.x / zb, t.b.y / zb, t.b.z },
-        { t.c.x / zc, t.c.y / zc, t.c.z },
+        { t.a.x / za, t.a.y / za, t.a.z / za },
+        { t.b.x / zb, t.b.y / zb, t.b.z / zb },
+        { t.c.x / zc, t.c.y / zc, t.c.z / zc },
     };
     return p;
 }
@@ -279,17 +294,6 @@ static Vertex vs(const Vertex a, const Vertex b)
         a.x - b.x,
         a.y - b.y,
         a.z - b.z,
-    };
-    return v;
-}
-
-// Vector addition.
-static Vertex va(const Vertex a, const Vertex b)
-{
-    const Vertex v = {
-        a.x + b.x,
-        a.y + b.y,
-        a.z + b.z,
     };
     return v;
 }
@@ -353,12 +357,6 @@ static Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-// Triangle normal.
-static Vertex tnm(const Triangle t)
-{
-    return vc(vs(t.b, t.a), vs(t.c, t.a));
-}
-
 static float zget(const Triangle t, const Vertex bc)
 {
     return bc.x * t.a.z + bc.y * t.b.z + bc.z * t.c.z;
@@ -411,20 +409,12 @@ static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Ve
     const Vertex z = vu(vs(e, c));
     const Vertex x = vu(vc(u, z));
     const Vertex y = vc(z, x);
-    const float xe = vd(x, e);
-    const float ye = vd(y, e);
-    const float ze = vd(z, e);
     const Triangle l = {
-        { vd(t.a, x) - xe, vd(t.a, y) - ye, vd(t.a, z) - ze },
-        { vd(t.b, x) - xe, vd(t.b, y) - ye, vd(t.b, z) - ze },
-        { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
+        { vd(t.a, x) - vd(x, e), vd(t.a, y) - vd(y, e), vd(t.a, z) - vd(z, e), },
+        { vd(t.b, x) - vd(x, e), vd(t.b, y) - vd(y, e), vd(t.b, z) - vd(z, e), },
+        { vd(t.c, x) - vd(x, e), vd(t.c, y) - vd(y, e), vd(t.c, z) - vd(z, e), },
     };
     return l;
-}
-
-static Triangle tweiv(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
-{
-    //return tview(t, e, c, u);
 }
 
 static Input iinit()
@@ -456,10 +446,15 @@ static void reset(float* const zbuff, uint32_t* const pixel, const int size)
     for(int i = 0; i < size; i++) pixel[i] = 0x0;
 }
 
+static float* znew(const int size)
+{
+    return (float*) malloc(sizeof(float) * size);
+}
+
 int main()
 {
-    const int xres = 800;
-    const int yres = 600;
+    const int xres = 600;
+    const int yres = 480;
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
@@ -468,16 +463,16 @@ int main()
         return 1;
     }
     const int lines = ulns(file);
+    const Faces fs = fsload(file, lines);
     const Vertices vs = vsload(file, lines);
     const Vertices vn = vnload(file, lines);
-    const Faces fs = fsload(file, lines);
     const Triangles ts = tsgen(vs, fs);
     const Triangles tn = tngen(vn, fs);
     const Sdl sdl = ssetup(xres, yres);
     const Vertex lights = { 0.0, 0.0, 1.0 }; // Must not change as backface culling relies on direction.
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
-    float* const zbuff = (float*) malloc(sizeof(float) * xres * yres);
+    float* const zbuff = znew(xres * yres);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
         uint32_t* const pixel = slock(sdl);
@@ -485,7 +480,7 @@ int main()
         const Vertex eye = ieye(input);
         for(int i = 0; i < ts.count; i++)
         {
-            const Triangle n = tn.triangle[i];//tweiv(tn.triangle[i], eye, center, upward);
+            const Triangle n = tn.triangle[i];
             const Triangle t = tview(ts.triangle[i], eye, center, upward);
             const Triangle p = tperspective(t);
             const Triangle v = tviewport(p, sdl);
