@@ -16,7 +16,8 @@ Vertices;
 
 typedef struct
 {
-    int va, vb, vc;
+    int va, vb, vc; // Vertice.
+    int na, nb, nc; // Normals.
 }
 Face;
 
@@ -134,10 +135,13 @@ static Faces fsload(FILE* const file, const int lines)
             sscanf(
                 line,
                 "f %d/%d/%d %d/%d/%d %d/%d/%d",
-                &f.va, &waste, &waste,
-                &f.vb, &waste, &waste,
-                &f.vc, &waste, &waste);
-            const Face indexed = { f.va - 1, f.vb - 1, f.vc - 1 };
+                &f.va, &waste, &f.na,
+                &f.vb, &waste, &f.nb,
+                &f.vc, &waste, &f.nc);
+            const Face indexed = {
+                f.va - 1, f.vb - 1, f.vc - 1,
+                f.na - 1, f.nb - 1, f.nc - 1,
+            };
             fs.face[fs.count++] = indexed;
         }
         free(line);
@@ -185,7 +189,8 @@ static Sdl ssetup(const int xres, const int yres)
     // To improve CPU line drawing cache speed the xres and yres for the painting canvas is reversed.
     // This offsets the canvas by 90 degrees. When the finished canvas frame is presented it will be
     // quickly rotated 90 degrees by the GPU. See: schurn(Sdl)
-    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
+    sdl.canvas = SDL_CreateTexture(sdl.renderer,
+        SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
     return sdl;
@@ -234,21 +239,33 @@ static Triangle tperspective(const Triangle t)
 // Vector subtraction.
 static Vertex vs(const Vertex a, const Vertex b)
 {
-    const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
+    const Vertex v = {
+        a.x - b.x,
+        a.y - b.y,
+        a.z - b.z,
+    };
     return v;
 }
 
 // Vector cross product.
 static Vertex vc(const Vertex a, const Vertex b)
 {
-    const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+    const Vertex c = {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    };
     return c;
 }
 
 // Vector scalar multiplication.
 static Vertex vm(const Vertex v, const float n)
 {
-    const Vertex m = { v.x * n, v.y * n, v.z * n };
+    const Vertex m = {
+        v.x * n,
+        v.y * n,
+        v.z * n,
+    };
     return m;
 }
 
@@ -330,18 +347,18 @@ static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float
     }
 }
 
-static Triangle tview(const Triangle t, const Vertex eye, const Vertex center, const Vertex up)
+static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
 {
-    const Vertex z = vu(vs(eye, center));
-    const Vertex x = vu(vc(up, z));
+    const Vertex z = vu(vs(e, c));
+    const Vertex x = vu(vc(u, z));
     const Vertex y = vc(z, x);
-    const float xe = vd(x, eye);
-    const float ye = vd(y, eye);
-    const float ze = vd(z, eye);
+    const float xe = vd(x, e);
+    const float ye = vd(y, e);
+    const float ze = vd(z, e);
     const Triangle l = {
-        { t.a.x * x.x + t.a.y * x.y + t.a.z * x.z - xe, t.a.x * y.x + t.a.y * y.y + t.a.z * y.z - ye, t.a.x * z.x + t.a.y * z.y + t.a.z * z.z - ze },
-        { t.b.x * x.x + t.b.y * x.y + t.b.z * x.z - xe, t.b.x * y.x + t.b.y * y.y + t.b.z * y.z - ye, t.b.x * z.x + t.b.y * z.y + t.b.z * z.z - ze },
-        { t.c.x * x.x + t.c.y * x.y + t.c.z * x.z - xe, t.c.x * y.x + t.c.y * y.y + t.c.z * y.z - ye, t.c.x * z.x + t.c.y * z.y + t.c.z * z.z - ze },
+        { vd(t.a, x) - xe, vd(t.a, y) - ye, vd(t.a, z) - ze },
+        { vd(t.b, x) - xe, vd(t.b, y) - ye, vd(t.b, z) - ze },
+        { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
     };
     return l;
 }
@@ -371,10 +388,8 @@ static Vertex ieye(const Input input)
 
 static void reset(float* const zbuff, uint32_t* const pixel, const int size)
 {
-    for(int i = 0; i < size; i++)
-        zbuff[i] = -FLT_MAX;
-    for(int i = 0; i < size; i++)
-        pixel[i] = 0x0;
+    for(int i = 0; i < size; i++) zbuff[i] = -FLT_MAX;
+    for(int i = 0; i < size; i++) pixel[i] = 0x0;
 }
 
 int main()
