@@ -119,6 +119,27 @@ static Vertices vsload(FILE* const file, const int lines)
     return vs;
 }
 
+static Vertices vnload(FILE* const file, const int lines)
+{
+    const int max = 128;
+    Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
+    for(int i = 0; i < lines; i++)
+    {
+        char* line = ureadln(file);
+        if(line[0] == 'v' && line[1] == 'n')
+        {
+            if(vs.count == vs.max)
+                vs.vertex = (Vertex*) realloc(vs.vertex, sizeof(Vertex) * (vs.max *= 2));
+            Vertex v;
+            sscanf(line, "vn %f %f %f", &v.x, &v.y, &v.z);
+            vs.vertex[vs.count++] = v;
+        }
+        free(line);
+    }
+    rewind(file);
+    return vs;
+}
+
 static Faces fsload(FILE* const file, const int lines)
 {
     const int max = 128;
@@ -159,6 +180,21 @@ static Triangles tsgen(const Vertices vs, const Faces fs)
             vs.vertex[fs.face[i].va],
             vs.vertex[fs.face[i].vb],
             vs.vertex[fs.face[i].vc],
+        };
+        ts.triangle[i] = t;
+    }
+    return ts;
+}
+
+static Triangles tngen(const Vertices vs, const Faces fs)
+{
+    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * fs.count), fs.count };
+    for(int i = 0; i < fs.count; i++)
+    {
+        const Triangle t = {
+            vs.vertex[fs.face[i].na],
+            vs.vertex[fs.face[i].nb],
+            vs.vertex[fs.face[i].nc],
         };
         ts.triangle[i] = t;
     }
@@ -247,6 +283,17 @@ static Vertex vs(const Vertex a, const Vertex b)
     return v;
 }
 
+// Vector addition.
+static Vertex va(const Vertex a, const Vertex b)
+{
+    const Vertex v = {
+        a.x + b.x,
+        a.y + b.y,
+        a.z + b.z,
+    };
+    return v;
+}
+
 // Vector cross product.
 static Vertex vc(const Vertex a, const Vertex b)
 {
@@ -322,7 +369,7 @@ static int vinside(const Vertex bc)
     return bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0;
 }
 
-static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float* const zbuff, const int shade)
+static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float* const zbuff, const Triangle n, const Vertex l)
 {
     const Box b = {
         (int) fminf(t.a.x, fminf(t.b.x, t.c.x)),
@@ -334,14 +381,26 @@ static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float
     for(int y = b.y0; y <= b.y1; y++)
     {
         const Vertex bc = tbc(t, x, y);
+        // Remember that the canvas is rotated 90 degrees
+        // so the everything  x and y are flipped here.
         if(vinside(bc))
         {
-            const float z = zget(t, bc);
-            // Remember that the canvas is rotated 90 degrees so the x and y are flipped here.
-            if(z > zbuff[y + x * yres])
+            // Notice the 90 degree rotation between a, b, and c.
+            const Vertex varying = {
+                vd(l, n.b),
+                vd(l, n.c),
+                vd(l, n.a),
+            };
+            const float brightness = vd(bc, varying);
+            if(brightness > 0.0)
             {
-                zbuff[y + x * yres] = z;
-                pixel[y + x * yres] = shade;
+                // Notice the 90 degree rotation between x and y.
+                const float z = zget(t, bc);
+                if(z > zbuff[y + x * yres])
+                {
+                    zbuff[y + x * yres] = z;
+                    pixel[y + x * yres] = brightness * 0xFF;
+                }
             }
         }
     }
@@ -361,6 +420,11 @@ static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Ve
         { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
     };
     return l;
+}
+
+static Triangle tweiv(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
+{
+    //return tview(t, e, c, u);
 }
 
 static Input iinit()
@@ -399,11 +463,16 @@ int main()
     const char* path = "obj/african_head.obj";
     FILE* const file = fopen(path, "r");
     if(!file)
+    {
         printf("could not open %s\n", path);
+        return 1;
+    }
     const int lines = ulns(file);
     const Vertices vs = vsload(file, lines);
+    const Vertices vn = vnload(file, lines);
     const Faces fs = fsload(file, lines);
     const Triangles ts = tsgen(vs, fs);
+    const Triangles tn = tngen(vn, fs);
     const Sdl sdl = ssetup(xres, yres);
     const Vertex lights = { 0.0, 0.0, 1.0 }; // Must not change as backface culling relies on direction.
     const Vertex center = { 0.0, 0.0, 0.0 };
@@ -416,15 +485,12 @@ int main()
         const Vertex eye = ieye(input);
         for(int i = 0; i < ts.count; i++)
         {
-            const Triangle t = ts.triangle[i];
-            const Triangle m = tview(t, eye, center, upward);
-            const Triangle p = tperspective(m);
+            const Triangle n = tn.triangle[i];//tweiv(tn.triangle[i], eye, center, upward);
+            const Triangle t = tview(ts.triangle[i], eye, center, upward);
+            const Triangle p = tperspective(t);
             const Triangle v = tviewport(p, sdl);
-            const float brightness = vd(vu(tnm(p)), lights);
-            const float shade = 0x0000FF * brightness;
             // Back face culling will not render the hidden triangles.
-            if(brightness > 0.0)
-                tdraw(yres, pixel, v, zbuff, shade);
+            tdraw(yres, pixel, v, zbuff, n, lights);
         }
         sunlock(sdl);
         schurn(sdl);
