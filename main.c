@@ -414,9 +414,38 @@ static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Ve
     const float ye = vd(y, e);
     const float ze = vd(z, e);
     const Triangle l = {
-        { vd(t.a, x) - xe, vd(t.a, y) - ye, vd(t.a, z) - ze },
-        { vd(t.b, x) - xe, vd(t.b, y) - ye, vd(t.b, z) - ze },
-        { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
+        {
+            -xe + t.a.x*x.x + t.a.y*x.y + t.a.z*x.z,
+            -ye + t.a.x*y.x + t.a.y*y.y + t.a.z*y.z,
+            -ze + t.a.x*z.x + t.a.y*z.y + t.a.z*z.z,
+        },{
+            -xe + t.b.x*x.x + t.b.y*x.y + t.b.z*x.z,
+            -ye + t.b.x*y.x + t.b.y*y.y + t.b.z*y.z,
+            -ze + t.b.x*z.x + t.b.y*z.y + t.b.z*z.z,
+        },{
+            -xe + t.c.x*x.x + t.c.y*x.y + t.c.z*x.z,
+            -ye + t.c.x*y.x + t.c.y*y.y + t.c.z*y.z,
+            -ze + t.c.x*z.x + t.c.y*z.y + t.c.z*z.z,
+        },
+    };
+    return l;
+}
+
+static Triangle tweiv(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
+{
+    const Vertex z = vu(vs(e, c));
+    const Vertex x = vu(vc(u, z));
+    const Vertex y = vc(z, x);
+    const float xe = vd(x, e);
+    const float ye = vd(y, e);
+    const float ze = vd(z, e);
+    const float denA = xe*t.a.x*y.y*z.z - xe*t.a.x*y.z*z.y - xe*t.a.y*y.x*z.z - -xe*t.a.y*y.z*z.x - -xe*t.a.z*y.x*z.y - xe*t.a.z*y.y*z.x - ye*t.a.x*x.y*z.z - -ye*t.a.x*x.z*z.y - -ye*t.a.y*x.x*z.z - ye*t.a.y*x.z*z.x - ye*t.a.z*x.x*z.y - -ye*t.a.z*x.y*z.x - -ze*t.a.x*x.y*y.z - ze*t.a.x*x.z*y.y - ze*t.a.y*x.x*y.z - -ze*t.a.y*x.z*y.x - -ze*t.a.z*x.x*y.y - ze*t.a.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
+    const float denB = xe*t.b.x*y.y*z.z - xe*t.b.x*y.z*z.y - xe*t.b.y*y.x*z.z - -xe*t.b.y*y.z*z.x - -xe*t.b.z*y.x*z.y - xe*t.b.z*y.y*z.x - ye*t.b.x*x.y*z.z - -ye*t.b.x*x.z*z.y - -ye*t.b.y*x.x*z.z - ye*t.b.y*x.z*z.x - ye*t.b.z*x.x*z.y - -ye*t.b.z*x.y*z.x - -ze*t.b.x*x.y*y.z - ze*t.b.x*x.z*y.y - ze*t.b.y*x.x*y.z - -ze*t.b.y*x.z*y.x - -ze*t.b.z*x.x*y.y - ze*t.b.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
+    const float denC = xe*t.c.x*y.y*z.z - xe*t.c.x*y.z*z.y - xe*t.c.y*y.x*z.z - -xe*t.c.y*y.z*z.x - -xe*t.c.z*y.x*z.y - xe*t.c.z*y.y*z.x - ye*t.c.x*x.y*z.z - -ye*t.c.x*x.z*z.y - -ye*t.c.y*x.x*z.z - ye*t.c.y*x.z*z.x - ye*t.c.z*x.x*z.y - -ye*t.c.z*x.y*z.x - -ze*t.c.x*x.y*y.z - ze*t.c.x*x.z*y.y - ze*t.c.y*x.x*y.z - -ze*t.c.y*x.z*y.x - -ze*t.c.z*x.x*y.y - ze*t.c.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
+    const Triangle l = {
+        { (t.a.x*y.y*z.z - t.a.x*y.z*z.y - t.a.y*y.x*z.z + t.a.y*y.z*z.x + t.a.z*y.x*z.y - t.a.z*y.y*z.x) / denA, (-t.a.x*x.y*z.z + t.a.x*x.z*z.y + t.a.y*x.x*z.z - t.a.y*x.z*z.x - t.a.z*x.x*z.y + t.a.z*x.y*z.x) / denA, (t.a.x*x.y*y.z - t.a.x*x.z*y.y - t.a.y*x.x*y.z + t.a.y*x.z*y.x + t.a.z*x.x*y.y - t.a.z*x.y*y.x) / denA },
+        { (t.b.x*y.y*z.z - t.b.x*y.z*z.y - t.b.y*y.x*z.z + t.b.y*y.z*z.x + t.b.z*y.x*z.y - t.b.z*y.y*z.x) / denB, (-t.b.x*x.y*z.z + t.b.x*x.z*z.y + t.b.y*x.x*z.z - t.b.y*x.z*z.x - t.b.z*x.x*z.y + t.b.z*x.y*z.x) / denB, (t.b.x*x.y*y.z - t.b.x*x.z*y.y - t.b.y*x.x*y.z + t.b.y*x.z*y.x + t.b.z*x.x*y.y - t.b.z*x.y*y.x) / denB },
+        { (t.c.x*y.y*z.z - t.c.x*y.z*z.y - t.c.y*y.x*z.z + t.c.y*y.z*z.x + t.c.z*y.x*z.y - t.c.z*y.y*z.x) / denC, (-t.c.x*x.y*z.z + t.c.x*x.z*z.y + t.c.y*x.x*z.z - t.c.y*x.z*z.x - t.c.z*x.x*z.y + t.c.z*x.y*z.x) / denC, (t.c.x*x.y*y.z - t.c.x*x.z*y.y - t.c.y*x.x*y.z + t.c.y*x.z*y.x + t.c.z*x.x*y.y - t.c.z*x.y*y.x) / denC },
     };
     return l;
 }
@@ -484,7 +513,7 @@ int main()
         const Vertex eye = ieye(input);
         for(int i = 0; i < ts.count; i++)
         {
-            const Triangle n = tn.triangle[i];
+            const Triangle n = tweiv(tn.triangle[i], eye, center, upward);
             const Triangle t = tview(ts.triangle[i], eye, center, upward);
             const Triangle p = tperspective(t);
             const Triangle v = tviewport(p, sdl);
