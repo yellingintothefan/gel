@@ -1,6 +1,6 @@
 # gel
 
-Gel aims to immitate the core of opengl with software.
+Gel aims to immitate the core of OpenGL 2.0 with software.
 
     make; ./gel
 
