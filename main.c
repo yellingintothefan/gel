@@ -16,8 +16,10 @@ Vertices;
 
 typedef struct
 {
-    int va, vb, vc; // Vertice.
-    int na, nb, nc; // Normals.
+    // Vertice.
+    int va, vb, vc;
+    // Normals.
+    int na, nb, nc;
 }
 Face;
 
@@ -273,7 +275,7 @@ static Triangle tviewport(const Triangle t, const Sdl sdl)
     return v;
 }
 
-static Triangle tperspective(const Triangle t)
+static Triangle tpersp(const Triangle t)
 {
     const float c = 3.0;
     const float za = 1.0 - t.a.z / c;
@@ -290,33 +292,21 @@ static Triangle tperspective(const Triangle t)
 // Vector subtraction.
 static Vertex vs(const Vertex a, const Vertex b)
 {
-    const Vertex v = {
-        a.x - b.x,
-        a.y - b.y,
-        a.z - b.z,
-    };
+    const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
     return v;
 }
 
 // Vector cross product.
 static Vertex vc(const Vertex a, const Vertex b)
 {
-    const Vertex c = {
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x,
-    };
+    const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
     return c;
 }
 
 // Vector scalar multiplication.
 static Vertex vm(const Vertex v, const float n)
 {
-    const Vertex m = {
-        v.x * n,
-        v.y * n,
-        v.z * n,
-    };
+    const Vertex m = { v.x * n, v.y * n, v.z * n };
     return m;
 }
 
@@ -357,33 +347,24 @@ static Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-static float zget(const Triangle t, const Vertex bc)
-{
-    return bc.x * t.a.z + bc.y * t.b.z + bc.z * t.c.z;
-}
-
-static int vinside(const Vertex bc)
-{
-    return bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0;
-}
-
-static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float* const zbuff, const Triangle n, const Vertex l)
+// Draws a triangle in its viewport (v) with normal indices (n). A lighting vertex (l) determines triangle shade. zbuffer is modified.
+static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Triangle v, const Triangle n, const Vertex l)
 {
     const Box b = {
-        (int) fminf(t.a.x, fminf(t.b.x, t.c.x)),
-        (int) fminf(t.a.y, fminf(t.b.y, t.c.y)),
-        (int) fmaxf(t.a.x, fmaxf(t.b.x, t.c.x)),
-        (int) fmaxf(t.a.y, fmaxf(t.b.y, t.c.y)),
+        (int) fminf(v.a.x, fminf(v.b.x, v.c.x)),
+        (int) fminf(v.a.y, fminf(v.b.y, v.c.y)),
+        (int) fmaxf(v.a.x, fmaxf(v.b.x, v.c.x)),
+        (int) fmaxf(v.a.y, fmaxf(v.b.y, v.c.y)),
     };
     for(int x = b.x0; x <= b.x1; x++)
     for(int y = b.y0; y <= b.y1; y++)
     {
-        const Vertex bc = tbc(t, x, y);
+        const Vertex bc = tbc(v, x, y);
         // Remember that the canvas is rotated 90 degrees
         // so the everything  x and y are flipped here.
-        if(vinside(bc))
+        if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
-            // Notice the 90 degree rotation between a, b, and c.
+            // Notice the 90 degree rotation between a, b, and c such that the order is b, c, a.
             const Vertex varying = {
                 vd(l, n.b),
                 vd(l, n.c),
@@ -392,8 +373,9 @@ static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float
             const float brightness = vd(bc, varying);
             if(brightness > 0.0)
             {
+                // Z-depth is triangle depth multiplied by barycenter weights.
+                const float z = bc.x * v.a.z + bc.y * v.b.z + bc.z * v.c.z;
                 // Notice the 90 degree rotation between x and y.
-                const float z = zget(t, bc);
                 if(z > zbuff[y + x * yres])
                 {
                     zbuff[y + x * yres] = z;
@@ -404,8 +386,8 @@ static void tdraw(const int yres, uint32_t* const pixel, const Triangle t, float
     }
 }
 
-// To rotate and translate normals, do the inverse, then the transpose, of this view matrix.
-static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
+// Rotates, translates, and scales triangles.
+static Triangle tlookatt(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
 {
     const Vertex z = vu(vs(e, c));
     const Vertex x = vu(vc(u, z));
@@ -413,41 +395,33 @@ static Triangle tview(const Triangle t, const Vertex e, const Vertex c, const Ve
     const float xe = vd(x, e);
     const float ye = vd(y, e);
     const float ze = vd(z, e);
-    const Triangle l = {
-        {
-            -xe + t.a.x*x.x + t.a.y*x.y + t.a.z*x.z,
-            -ye + t.a.x*y.x + t.a.y*y.y + t.a.z*y.z,
-            -ze + t.a.x*z.x + t.a.y*z.y + t.a.z*z.z,
-        },{
-            -xe + t.b.x*x.x + t.b.y*x.y + t.b.z*x.z,
-            -ye + t.b.x*y.x + t.b.y*y.y + t.b.z*y.z,
-            -ze + t.b.x*z.x + t.b.y*z.y + t.b.z*z.z,
-        },{
-            -xe + t.c.x*x.x + t.c.y*x.y + t.c.z*x.z,
-            -ye + t.c.x*y.x + t.c.y*y.y + t.c.z*y.z,
-            -ze + t.c.x*z.x + t.c.y*z.y + t.c.z*z.z,
-        },
+    const Triangle o = {
+        { vd(t.a, x) - xe, vd(t.a, y) - ye, vd(t.a, z) - ze },
+        { vd(t.b, x) - xe, vd(t.b, y) - ye, vd(t.b, z) - ze },
+        { vd(t.c, x) - xe, vd(t.c, y) - ye, vd(t.c, z) - ze },
     };
-    return l;
+    return o;
 }
 
-static Triangle tweiv(const Triangle t, const Vertex e, const Vertex c, const Vertex u)
+static Triangle tu(const Triangle t)
+{
+    const Triangle u = { vu(t.a), vu(t.b), vu(t.c) };
+    return u;
+}
+
+// Rotates normal vectors.
+static Triangle tlookatn(const Triangle n, const Vertex e, const Vertex c, const Vertex u)
 {
     const Vertex z = vu(vs(e, c));
     const Vertex x = vu(vc(u, z));
     const Vertex y = vc(z, x);
-    const float xe = vd(x, e);
-    const float ye = vd(y, e);
-    const float ze = vd(z, e);
-    const float denA = xe*t.a.x*y.y*z.z - xe*t.a.x*y.z*z.y - xe*t.a.y*y.x*z.z - -xe*t.a.y*y.z*z.x - -xe*t.a.z*y.x*z.y - xe*t.a.z*y.y*z.x - ye*t.a.x*x.y*z.z - -ye*t.a.x*x.z*z.y - -ye*t.a.y*x.x*z.z - ye*t.a.y*x.z*z.x - ye*t.a.z*x.x*z.y - -ye*t.a.z*x.y*z.x - -ze*t.a.x*x.y*y.z - ze*t.a.x*x.z*y.y - ze*t.a.y*x.x*y.z - -ze*t.a.y*x.z*y.x - -ze*t.a.z*x.x*y.y - ze*t.a.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
-    const float denB = xe*t.b.x*y.y*z.z - xe*t.b.x*y.z*z.y - xe*t.b.y*y.x*z.z - -xe*t.b.y*y.z*z.x - -xe*t.b.z*y.x*z.y - xe*t.b.z*y.y*z.x - ye*t.b.x*x.y*z.z - -ye*t.b.x*x.z*z.y - -ye*t.b.y*x.x*z.z - ye*t.b.y*x.z*z.x - ye*t.b.z*x.x*z.y - -ye*t.b.z*x.y*z.x - -ze*t.b.x*x.y*y.z - ze*t.b.x*x.z*y.y - ze*t.b.y*x.x*y.z - -ze*t.b.y*x.z*y.x - -ze*t.b.z*x.x*y.y - ze*t.b.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
-    const float denC = xe*t.c.x*y.y*z.z - xe*t.c.x*y.z*z.y - xe*t.c.y*y.x*z.z - -xe*t.c.y*y.z*z.x - -xe*t.c.z*y.x*z.y - xe*t.c.z*y.y*z.x - ye*t.c.x*x.y*z.z - -ye*t.c.x*x.z*z.y - -ye*t.c.y*x.x*z.z - ye*t.c.y*x.z*z.x - ye*t.c.z*x.x*z.y - -ye*t.c.z*x.y*z.x - -ze*t.c.x*x.y*y.z - ze*t.c.x*x.z*y.y - ze*t.c.y*x.x*y.z - -ze*t.c.y*x.z*y.x - -ze*t.c.z*x.x*y.y - ze*t.c.z*x.y*y.x + x.x*y.y*z.z - x.x*y.z*z.y - x.y*y.x*z.z + x.y*y.z*z.x + x.z*y.x*z.y - x.z*y.y*z.x;
-    const Triangle l = {
-        { (t.a.x*y.y*z.z - t.a.x*y.z*z.y - t.a.y*y.x*z.z + t.a.y*y.z*z.x + t.a.z*y.x*z.y - t.a.z*y.y*z.x) / denA, (-t.a.x*x.y*z.z + t.a.x*x.z*z.y + t.a.y*x.x*z.z - t.a.y*x.z*z.x - t.a.z*x.x*z.y + t.a.z*x.y*z.x) / denA, (t.a.x*x.y*y.z - t.a.x*x.z*y.y - t.a.y*x.x*y.z + t.a.y*x.z*y.x + t.a.z*x.x*y.y - t.a.z*x.y*y.x) / denA },
-        { (t.b.x*y.y*z.z - t.b.x*y.z*z.y - t.b.y*y.x*z.z + t.b.y*y.z*z.x + t.b.z*y.x*z.y - t.b.z*y.y*z.x) / denB, (-t.b.x*x.y*z.z + t.b.x*x.z*z.y + t.b.y*x.x*z.z - t.b.y*x.z*z.x - t.b.z*x.x*z.y + t.b.z*x.y*z.x) / denB, (t.b.x*x.y*y.z - t.b.x*x.z*y.y - t.b.y*x.x*y.z + t.b.y*x.z*y.x + t.b.z*x.x*y.y - t.b.z*x.y*y.x) / denB },
-        { (t.c.x*y.y*z.z - t.c.x*y.z*z.y - t.c.y*y.x*z.z + t.c.y*y.z*z.x + t.c.z*y.x*z.y - t.c.z*y.y*z.x) / denC, (-t.c.x*x.y*z.z + t.c.x*x.z*z.y + t.c.y*x.x*z.z - t.c.y*x.z*z.x - t.c.z*x.x*z.y + t.c.z*x.y*z.x) / denC, (t.c.x*x.y*y.z - t.c.x*x.z*y.y - t.c.y*x.x*y.z + t.c.y*x.z*y.x + t.c.z*x.x*y.y - t.c.z*x.y*y.x) / denC },
+    const Triangle o = {
+        { vd(n.a, x), vd(n.a, y), vd(n.a, z) },
+        { vd(n.b, x), vd(n.b, y), vd(n.b, z) },
+        { vd(n.c, x), vd(n.c, y), vd(n.c, z) },
     };
-    return l;
+    // Normalize for good measure
+    return tu(o);
 }
 
 static Input iinit()
@@ -475,8 +449,7 @@ static Vertex ieye(const Input input)
 
 static void reset(float* const zbuff, uint32_t* const pixel, const int size)
 {
-    for(int i = 0; i < size; i++) zbuff[i] = -FLT_MAX;
-    for(int i = 0; i < size; i++) pixel[i] = 0x0;
+    for(int i = 0; i < size; i++) zbuff[i] = -FLT_MAX, pixel[i] = 0x0;
 }
 
 static float* znew(const int size)
@@ -505,24 +478,23 @@ int main()
     const Vertex lights = { 0.0, 0.0, 1.0 }; // Must not change as backface culling relies on direction.
     const Vertex center = { 0.0, 0.0, 0.0 };
     const Vertex upward = { 0.0, 1.0, 0.0 };
-    float* const zbuff = znew(xres * yres);
+    const int size = xres * yres;
+    float* const zbuff = znew(size);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
         uint32_t* const pixel = slock(sdl);
-        reset(zbuff, pixel, xres * yres);
+        reset(zbuff, pixel, size);
         const Vertex eye = ieye(input);
         for(int i = 0; i < ts.count; i++)
         {
-            const Triangle n = tweiv(tn.triangle[i], eye, center, upward);
-            const Triangle t = tview(ts.triangle[i], eye, center, upward);
-            const Triangle p = tperspective(t);
+            const Triangle n = tlookatn(tn.triangle[i], eye, center, upward);
+            const Triangle t = tlookatt(ts.triangle[i], eye, center, upward);
+            const Triangle p = tpersp(t);
             const Triangle v = tviewport(p, sdl);
-            // Back face culling will not render the hidden triangles.
-            tdraw(yres, pixel, v, zbuff, n, lights);
+            tdraw(yres, pixel, zbuff, v, n, lights);
         }
         sunlock(sdl);
         schurn(sdl);
         spresent(sdl);
     }
-    // Theres no need to cleanup - the OS will do so and give us a quick exit.
 }
