@@ -20,9 +20,11 @@
 /*         \::/____/                \::/    /                \::/    / */
 /*                                   \/____/                  \/____/  */
 /*                                                                     */
-/*                       Graphical Emluation Layer                     */
-/*                   OpenGL 2.0 emulated in 768 lines                  */
-/*                     Gustav Louw (C) 2017 MIT LIC                    */
+/*                      Graphical Emluation Layer                      */
+/*          GEL aims to simulate primitive graphics rendering          */
+/*                  to the likes of the N64, including                 */
+/*            zbuffering, texture mapping, Gouraud shading,            */
+/*                     rotation and translatation.                     */
 
 #include <SDL2/SDL.h>
 
@@ -63,6 +65,15 @@ typedef struct
     int max;
 }
 Faces;
+
+typedef struct
+{
+    int x0;
+    int y0;
+    int x1;
+    int y1;
+}
+Enclosure;
 
 typedef struct
 {
@@ -275,12 +286,18 @@ static Vertex vmul(const Vertex v, const float n)
 
 static float vdot(const Vertex a, const Vertex b)
 {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+    return
+        a.x * b.x +
+        a.y * b.y +
+        a.z * b.z;
 }
 
 static float vlen(const Vertex v)
 {
-    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
+    return sqrtf(
+        v.x * v.x +
+        v.y * v.y +
+        v.z * v.z);
 }
 
 static Vertex vunt(const Vertex v)
@@ -373,20 +390,24 @@ static Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
-    // To improve CPU line drawing cache speed the xres and yres for the painting canvas is reversed.
-    // This offsets the canvas by 90 degrees. When the finished canvas frame is presented it will be
-    // quickly rotated 90 degrees by the GPU. See: schurn(Sdl)
-    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
+    sdl.canvas = SDL_CreateTexture(sdl.renderer,
+        SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+        // To improve CPU line drawing cache speed the xres and yres for the painting canvas is reversed.
+        // This offsets the canvas by 90 degrees. When the finished canvas frame is presented it will be
+        // quickly rotated 90 degrees by the GPU. See: schurn(Sdl)
+        yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
     return sdl;
 }
 
+// Unlocks the display once a frame is drawn.
 static void sunlock(const Sdl sdl)
 {
     SDL_UnlockTexture(sdl.canvas);
 }
 
+// Locks the display for pixel drawing.
 static uint32_t* slock(const Sdl sdl)
 {
     void* pixel;
@@ -395,19 +416,22 @@ static uint32_t* slock(const Sdl sdl)
     return (uint32_t*) pixel;
 }
 
+// Triangle viewport.
 static Triangle tviewport(const Triangle t, const Sdl sdl)
 {
-    const float w = sdl.xres / 2.0;
-    const float h = sdl.yres / 2.0;
-    const float z = 1.0 / 2.0;
+    const float w = sdl.yres / 1.5;
+    const float h = sdl.yres / 1.5;
+    const float x = sdl.xres / 2.0;
+    const float y = sdl.yres / 4.0;
     const Triangle v = {
-        { w * (t.a.x + 1.0), h * (t.a.y + 1.0), z * (t.a.z + 1.0) },
-        { w * (t.b.x + 1.0), h * (t.b.y + 1.0), z * (t.b.z + 1.0) },
-        { w * (t.c.x + 1.0), h * (t.c.y + 1.0), z * (t.c.z + 1.0) },
+        { w * t.a.x + x, h * t.a.y + y, (t.a.z + 1.0) / 2.0 },
+        { w * t.b.x + x, h * t.b.y + y, (t.b.z + 1.0) / 2.0 },
+        { w * t.c.x + x, h * t.c.y + y, (t.c.z + 1.0) / 2.0 },
     };
     return v;
 }
 
+// Triangle perspective.
 static Triangle tpersp(const Triangle t)
 {
     const float c = 3.0;
@@ -422,6 +446,7 @@ static Triangle tpersp(const Triangle t)
     return p;
 }
 
+// Triangle barycenter.
 static Vertex tbc(const Triangle t, const int x, const int y)
 {
     const Vertex p = { (float) x, (float) y, 0.0 };
@@ -450,43 +475,77 @@ static uint32_t shade(const uint32_t pixel, const int shading)
     return r << 0x10 | g << 0x08 | b;
 }
 
-// Draws a triangle in its viewport (v) with normal indices (n). A lighting vertex (l) determines triangle shade. zbuffer is modified.
-static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Vertex lit, const Target t)
+static Enclosure enew(const Triangle t)
 {
-    const int x0 = fminf(t.vew.a.x, fminf(t.vew.b.x, t.vew.c.x));
-    const int y0 = fminf(t.vew.a.y, fminf(t.vew.b.y, t.vew.c.y));
-    const int x1 = fmaxf(t.vew.a.x, fmaxf(t.vew.b.x, t.vew.c.x));
-    const int y1 = fmaxf(t.vew.a.y, fmaxf(t.vew.b.y, t.vew.c.y));
-    for(int x = x0; x <= x1; x++)
-    for(int y = y0; y <= y1; y++)
+    const Enclosure e = {
+        fminf(t.a.x, fminf(t.b.x, t.c.x)),
+        fminf(t.a.y, fminf(t.b.y, t.c.y)),
+        fmaxf(t.a.x, fmaxf(t.b.x, t.c.x)),
+        fmaxf(t.a.y, fmaxf(t.b.y, t.c.y)),
+    };
+    return e;
+}
+
+// Draw triangle. All the magic happens here.
+static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Target t)
+{
+    // Create a square enclosure around the triangle for indexing.
+    const Enclosure e = enew(t.vew);
+    for(int x = e.x0; x <= e.x1; x++)
+    for(int y = e.y0; y <= e.y1; y++)
     {
+        // Determine the barycenter coordinates of the triangle.
         const Vertex bc = tbc(t.vew, x, y);
-        // Remember that the canvas is rotated 90 degrees so the everything  x and y are flipped here.
+        // If within the barycenter of triangle then fill the triangle.
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
-            // Notice the 90 degree rotation between a, b, and c such that the order is b, c, a.
+            // The light from the camera must face the object.
+            const Vertex light = { 0.0, 0.0, 1.0 };
+            // The varying light intensity across polygons is interpolated using gourard shading.
+            // Note: Due to the 90 degree rotation the renderer will perform at the end of the frame
+            // triangle coordinates are put on their side. That is, triangle vertices A, B, and C
+            // must be rotated 90 degrees such that the order is B, C, A.
             const Vertex varying = {
-                vdot(lit, t.nrm.b),
-                vdot(lit, t.nrm.c),
-                vdot(lit, t.nrm.a),
+                vdot(light, t.nrm.b), // B
+                vdot(light, t.nrm.c), // C
+                vdot(light, t.nrm.a), // A
             };
+            // The intensity of light reaching the camera is then the vector dot product between
+            // the varying intensity of a polygon and the polygon barycenter coordinate.
             const float intensity = vdot(bc, varying);
-            if(intensity > 0.0)
+            // A shading value maps the intensity [0.0 - 1.0] to [0x00 - 0xFF].
+            const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
+            // The distance from the triangle point to the camera is a multiplcation of the barycenter weights
+            // by the triangle Z-coordinates.
+            const float z =
+                bc.x * t.vew.b.z + // B
+                bc.y * t.vew.c.z + // C
+                bc.z * t.vew.a.z;  // A
+            // If the Z-depth is greater than a previous Z-depth, a new pixel must be placed,
+            // and the old Z-depth must be updated.
+            // Note: The zbuffer is also on its side like the render frame. X and Y are flipped for the index.
+            if(z > zbuff[y + x * yres])
             {
-                const int shading = 0xFF * intensity;
-                // Z-depth is triangle depth multiplied by barycenter weights.
-                const float z = bc.x * t.vew.a.z + bc.y * t.vew.b.z + bc.z * t.vew.c.z;
-                // Notice the 90 degree rotation between x and y.
-                if(z > zbuff[y + x * yres])
-                {
-                    const uint32_t* const pixels = (uint32_t*) t.dif->pixels;
-                    // Once again, a, b, and c are rotate here t.to b, c, a.
-                    const int xx = t.dif->w * (0.0 + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
-                    const int yy = t.dif->h * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
-                    // y and x are flipped, but xx and yy are regular to image.
-                    zbuff[y + x * yres] = z;
-                    pixel[y + x * yres] = shade(pixels[xx + yy * t.dif->w], shading);
-                }
+                const uint32_t* const pixels = (uint32_t*) t.dif->pixels;
+                // For texture mapping, the position of the texture is a multiplication of the barycenter weights
+                // by the triangle X-coordinates.
+                // Note: Once again, a, b, and c are rotate here to b, c, a.
+                const int xx = t.dif->w * (
+                    bc.x * t.tex.b.x + // B
+                    bc.y * t.tex.c.x + // C
+                    bc.z * t.tex.a.x); // A
+                // Same goes for the Y-coordinates.
+                // The image coordinate system starts bottom left, and renderer starts top left, so the
+                // final weight becomes 1.0 - weight.
+                const int yy = t.dif->h * (1.0 - (
+                    bc.x * t.tex.b.y +  // B
+                    bc.y * t.tex.c.y +  // C
+                    bc.z * t.tex.a.y)); // A
+                // Shade away.
+                const uint32_t shaded = shade(pixels[xx + yy * t.dif->w], shading);
+                // Y and X flipped again but XX and YY are not as the image is not on its side.
+                zbuff[y + x * yres] = z;
+                pixel[y + x * yres] = shaded;
             }
         }
     }
@@ -495,18 +554,17 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
 // Rotates, translates, and scales triangles.
 static Triangle tviewt(const Triangle t, const Vertex x, const Vertex y, const Vertex z, const Vertex eye)
 {
-    const float xe = vdot(x, eye);
-    const float ye = vdot(y, eye);
-    const float ze = vdot(z, eye);
     const Triangle o = {
-        { vdot(t.a, x) - xe, vdot(t.a, y) - ye, vdot(t.a, z) - ze },
-        { vdot(t.b, x) - xe, vdot(t.b, y) - ye, vdot(t.b, z) - ze },
-        { vdot(t.c, x) - xe, vdot(t.c, y) - ye, vdot(t.c, z) - ze },
+        { vdot(t.a, x) - vdot(x, eye), vdot(t.a, y) - vdot(y, eye), vdot(t.a, z) - vdot(z, eye) },
+        { vdot(t.b, x) - vdot(x, eye), vdot(t.b, y) - vdot(y, eye), vdot(t.b, z) - vdot(z, eye) },
+        { vdot(t.c, x) - vdot(x, eye), vdot(t.c, y) - vdot(y, eye), vdot(t.c, z) - vdot(z, eye) },
     };
     return o;
 }
 
 // Rotates normal vectors.
+// Normally done with hte inverse transpose of the matrix defined in tviewt(),
+// but approximated well enough by removing translation (eye dot products) from said matrix.
 static Triangle tviewn(const Triangle n, const Vertex x, const Vertex y, const Vertex z)
 {
     const Triangle o = {
@@ -543,7 +601,10 @@ static Input ipump(Input input)
 static void reset(float* const zbuff, uint32_t* const pixel, const int size)
 {
     for(int i = 0; i < size; i++)
-        zbuff[i] = -FLT_MAX, pixel[i] = 0x0;
+    {
+        zbuff[i] = -FLT_MAX;
+        pixel[i] = 0x0;
+    }
 }
 
 static SDL_Surface* sload(const char* const path)
@@ -583,17 +644,16 @@ static float vmaxlen(const Vertices vsv)
 
 int main()
 {
-    FILE* const obj = oload("anju/anju.obj");
-    SDL_Surface* const dif = sload("anju/anju_grp.bmp");
-    const int xres = 600;
+    FILE* const obj = oload("model/anju.obj");
+    SDL_Surface* const dif = sload("model/anju.bmp");
+    const int xres = 800;
     const int yres = 600;
     const int lines = ulns(obj);
     const Faces fs = fsload(obj, lines);
     const Vertices vsv = vsvload(obj, lines);
     const Vertices vst = vstload(obj, lines);
     const Vertices vsn = vsnload(obj, lines);
-    const float scale = vmaxlen(vsv);
-    const Triangles ts = tsgen(vsv, fs, scale);
+    const Triangles ts = tsgen(vsv, fs, vmaxlen(vsv));
     const Triangles tt = ttgen(vst, fs);
     const Triangles tn = tngen(vsn, fs);
     const Sdl sdl = ssetup(xres, yres);
@@ -602,7 +662,6 @@ int main()
     {
         uint32_t* const pixel = slock(sdl);
         reset(zbuff, pixel, xres * yres);
-        const Vertex lit = { 0.0, 0.0, 1.0 };
         const Vertex ctr = { 0.0, 0.0, 0.0 };
         const Vertex ups = { 0.0, 1.0, 0.0 };
         const Vertex eye = {
@@ -619,9 +678,9 @@ int main()
             const Triangle tex = tt.triangle[i];
             const Triangle tri = tviewt(ts.triangle[i], x, y, z, eye);
             const Triangle per = tpersp(tri);
-            const Triangle vew = tviewport(per, sdl);
+            const Triangle vew = tviewport(input.key[SDL_SCANCODE_Q] ? tri : per, sdl);
             const Target targ = { vew, nrm, tex, dif };
-            tdraw(yres, pixel, zbuff, lit, targ);
+            tdraw(yres, pixel, zbuff, targ);
         }
         sunlock(sdl);
         schurn(sdl);
