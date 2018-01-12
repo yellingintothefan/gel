@@ -288,6 +288,16 @@ static Vertex vunt(const Vertex v)
     return vmul(v, 1.0 / vlen(v));
 }
 
+static Triangle tu(const Triangle t)
+{
+    const Triangle u = {
+        vunt(t.a),
+        vunt(t.b),
+        vunt(t.c),
+    };
+    return u;
+}
+
 Triangles tsnew(const int count)
 {
     const Triangles ts = {
@@ -297,15 +307,15 @@ Triangles tsnew(const int count)
     return ts;
 }
 
-static Triangles tsgen(const Vertices vs, const Faces fs)
+static Triangles tsgen(const Vertices vs, const Faces fs, const float scale)
 {
     Triangles ts = tsnew(fs.count);
     for(int i = 0; i < ts.count; i++)
     {
         const Triangle t = {
-            vs.vertex[fs.face[i].va],
-            vs.vertex[fs.face[i].vb],
-            vs.vertex[fs.face[i].vc],
+            vmul(vs.vertex[fs.face[i].va], 1.0 / scale),
+            vmul(vs.vertex[fs.face[i].vb], 1.0 / scale),
+            vmul(vs.vertex[fs.face[i].vc], 1.0 / scale),
         };
         ts.triangle[i] = t;
     }
@@ -471,7 +481,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 {
                     const uint32_t* const pixels = (uint32_t*) t.dif->pixels;
                     // Once again, a, b, and c are rotate here t.to b, c, a.
-                    const int xx = t.dif->w * (1.0 - (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
+                    const int xx = t.dif->w * (0.0 + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
                     const int yy = t.dif->h * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                     // y and x are flipped, but xx and yy are regular to image.
                     zbuff[y + x * yres] = z;
@@ -494,16 +504,6 @@ static Triangle tviewt(const Triangle t, const Vertex x, const Vertex y, const V
         { vdot(t.c, x) - xe, vdot(t.c, y) - ye, vdot(t.c, z) - ze },
     };
     return o;
-}
-
-static Triangle tu(const Triangle t)
-{
-    const Triangle u = {
-        vunt(t.a),
-        vunt(t.b),
-        vunt(t.c),
-    };
-    return u;
 }
 
 // Rotates normal vectors.
@@ -572,18 +572,28 @@ static FILE* oload(const char* const path)
     return file;
 }
 
+static float vmaxlen(const Vertices vsv)
+{
+    float max = 0;
+    for(int i = 0; i < vsv.count; i++)
+        if(vlen(vsv.vertex[i]) > max)
+            max = vlen(vsv.vertex[i]);
+    return max;
+}
+
 int main()
 {
-    FILE* const obj = oload("head.obj");
-    SDL_Surface* const dif = sload("head_diffuse.bmp");
+    FILE* const obj = oload("anju/anju.obj");
+    SDL_Surface* const dif = sload("anju/anju_grp.bmp");
     const int xres = 600;
-    const int yres = 480;
+    const int yres = 600;
     const int lines = ulns(obj);
     const Faces fs = fsload(obj, lines);
     const Vertices vsv = vsvload(obj, lines);
     const Vertices vst = vstload(obj, lines);
     const Vertices vsn = vsnload(obj, lines);
-    const Triangles ts = tsgen(vsv, fs);
+    const float scale = vmaxlen(vsv);
+    const Triangles ts = tsgen(vsv, fs, scale);
     const Triangles tt = ttgen(vst, fs);
     const Triangles tn = tngen(vsn, fs);
     const Sdl sdl = ssetup(xres, yres);
