@@ -24,7 +24,7 @@
 /*          GEL aims to simulate primitive graphics rendering          */
 /*                  to the likes of the N64, including                 */
 /*            zbuffering, texture mapping, Gouraud shading,            */
-/*                     rotation and translatation.                     */
+/*                      rotation and translation.                      */
 
 #include <SDL2/SDL.h>
 
