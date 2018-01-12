@@ -520,7 +520,12 @@ static Triangle tviewn(const Triangle n, const Vertex x, const Vertex y, const V
 
 static Input iinit()
 {
-    const Input input = { 0.0, 0.0, 0.005, SDL_GetKeyboardState(NULL) };
+    const Input input = {
+        0.0,
+        0.0,
+        0.005,
+        SDL_GetKeyboardState(NULL)
+    };
     SDL_SetRelativeMouseMode(SDL_FALSE);
     return input;
 }
