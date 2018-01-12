@@ -110,7 +110,9 @@ static char* ureadln(FILE* const file)
 
 static Vertices vsnew(const int max)
 {
-    const Vertices vs = { (Vertex*) malloc(sizeof(Vertex) * max), 0, max };
+    const Vertices vs = {
+        (Vertex*) malloc(sizeof(Vertex) * max), 0, max
+    };
     return vs;
 }
 
@@ -176,7 +178,9 @@ static Vertices vtload(FILE* const file, const int lines)
 
 static Faces fsnew(const int max)
 {
-    const Faces fs = { (Face*) malloc(sizeof(Face) * max), 0, max };
+    const Faces fs = {
+        (Face*) malloc(sizeof(Face) * max), 0, max
+    };
     return fs;
 }
 
