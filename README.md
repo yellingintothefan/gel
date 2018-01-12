@@ -1,6 +1,6 @@
 # gel
 
-Gel aims to immitate the core of OpenGL 2.0 with software.
+Gel (Graphical Emulation Layer) aims to immitate the core of OpenGL 2.0 with software with as few lines as possible.
 
     make; ./gel
 
