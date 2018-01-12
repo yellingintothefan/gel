@@ -494,11 +494,6 @@ static void reset(float* const zbuff, uint32_t* const pixel, const int size)
         zbuff[i] = -FLT_MAX, pixel[i] = 0x0;
 }
 
-static float* znew(const int size)
-{
-    return (float*) malloc(sizeof(float) * size);
-}
-
 static SDL_Surface* sload(const char* const path)
 {
     SDL_Surface* const bmp = SDL_LoadBMP(path);
@@ -540,7 +535,7 @@ int main()
     const Triangles tt = ttgen(vst, fs);
     const Triangles tn = tngen(vsn, fs);
     const Sdl sdl = ssetup(xres, yres);
-    float* const zbuff = znew(xres * yres);
+    float* const zbuff = (float*) malloc(sizeof(float) * xres * yres);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
         uint32_t* const pixel = slock(sdl);
