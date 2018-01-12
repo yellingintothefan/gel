@@ -499,36 +499,24 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
         // If within the barycenter of triangle then fill the triangle.
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
-            // The light from the camera must face the object.
-            const Vertex light = { 0.0, 0.0, 1.0 };
-            // The varying light intensity across polygons is interpolated using gourard shading.
-            // Note: Due to the 90 degree rotation the renderer will perform at the end of the frame
-            // triangle coordinates are put on their side. That is, triangle vertices A, B, and C
-            // must be rotated 90 degrees such that the order is B, C, A.
-            const Vertex varying = {
-                vdot(light, t.nrm.b), // B
-                vdot(light, t.nrm.c), // C
-                vdot(light, t.nrm.a), // A
-            };
-            // The intensity of light reaching the camera is then the vector dot product between
-            // the varying intensity of a polygon and the polygon barycenter coordinate.
-            const float intensity = vdot(bc, varying);
-            // A shading value maps the intensity [0.0 - 1.0] to [0x00 - 0xFF].
-            const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
-            // The distance from the triangle point to the camera is a multiplcation of the barycenter weights
-            // by the triangle Z-coordinates.
             const float z =
                 bc.x * t.vew.b.z + // B
                 bc.y * t.vew.c.z + // C
                 bc.z * t.vew.a.z;  // A
-            // If the Z-depth is greater than a previous Z-depth, a new pixel must be placed,
-            // and the old Z-depth must be updated.
             // Note: The zbuffer is also on its side like the render frame. X and Y are flipped for the index.
             if(z > zbuff[y + x * yres])
             {
+                // The light from the camera must face the object.
+                const Vertex light = { 0.0, 0.0, 1.0 };
+                // Note: Due to the 90 degree rotation the renderer will perform at the end of the frame
+                // triangle coordinates are put on their side. That is, triangle vertices A, B, and C
+                // must be rotated 90 degrees such that the order is B, C, A.
+                const Vertex varying = {
+                    vdot(light, t.nrm.b), // B
+                    vdot(light, t.nrm.c), // C
+                    vdot(light, t.nrm.a), // A
+                };
                 const uint32_t* const pixels = (uint32_t*) t.dif->pixels;
-                // For texture mapping, the position of the texture is a multiplication of the barycenter weights
-                // by the triangle X-coordinates.
                 // Note: Once again, a, b, and c are rotate here to b, c, a.
                 const int xx = t.dif->w * (
                     bc.x * t.tex.b.x + // B
@@ -542,10 +530,11 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                     bc.y * t.tex.c.y +  // C
                     bc.z * t.tex.a.y)); // A
                 // Shade away.
-                const uint32_t shaded = shade(pixels[xx + yy * t.dif->w], shading);
+                const float intensity = vdot(bc, varying);
+                const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
                 // Y and X flipped again but XX and YY are not as the image is not on its side.
                 zbuff[y + x * yres] = z;
-                pixel[y + x * yres] = shaded;
+                pixel[y + x * yres] = shade(pixels[xx + yy * t.dif->w], shading);
             }
         }
     }
