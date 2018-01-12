@@ -2,7 +2,9 @@
 
 typedef struct
 {
-    float x, y, z;
+    float x;
+    float y;
+    float z;
 }
 Vertex;
 
@@ -16,9 +18,15 @@ Vertices;
 
 typedef struct
 {
-    int va, vb, vc;
-    int ta, tb, tc;
-    int na, nb, nc;
+    int va;
+    int vb;
+    int vc;
+    int ta;
+    int tb;
+    int tc;
+    int na;
+    int nb;
+    int nc;
 }
 Face;
 
@@ -32,7 +40,9 @@ Faces;
 
 typedef struct
 {
-    Vertex a, b, c;
+    Vertex a;
+    Vertex b;
+    Vertex c;
 }
 Triangle;
 
@@ -105,7 +115,9 @@ static char* ureadln(FILE* const file)
 static Vertices vsnew(const int max)
 {
     const Vertices vs = {
-        (Vertex*) malloc(sizeof(Vertex) * max), 0, max
+        (Vertex*) malloc(sizeof(Vertex) * max),
+        0,
+        max
     };
     return vs;
 }
@@ -173,7 +185,9 @@ static Vertices vtload(FILE* const file, const int lines)
 static Faces fsnew(const int max)
 {
     const Faces fs = {
-        (Face*) malloc(sizeof(Face) * max), 0, max
+        (Face*) malloc(sizeof(Face) * max),
+        0,
+        max
     };
     return fs;
 }
@@ -189,12 +203,7 @@ static Faces fsload(FILE* const file, const int lines)
             if(fs.count == fs.max)
                 fs.face = (Face*) realloc(fs.face, sizeof(Face) * (fs.max *= 2));
             Face f;
-            sscanf(
-                line,
-                "f %d/%d/%d %d/%d/%d %d/%d/%d",
-                &f.va, &f.ta, &f.na,
-                &f.vb, &f.tb, &f.nb,
-                &f.vc, &f.tc, &f.nc);
+            sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &f.va, &f.ta, &f.na, &f.vb, &f.tb, &f.nb, &f.vc, &f.tc, &f.nc);
             const Face indexed = {
                 f.va - 1, f.vb - 1, f.vc - 1,
                 f.ta - 1, f.tb - 1, f.tc - 1,
@@ -256,7 +265,8 @@ static Vertex vunt(const Vertex v)
 Triangles tsnew(const int count)
 {
     const Triangles ts = {
-        (Triangle*) malloc(sizeof(Triangle) * count), count
+        (Triangle*) malloc(sizeof(Triangle) * count),
+        count
     };
     return ts;
 }
@@ -397,9 +407,10 @@ static Vertex tbc(const Triangle t, const int x, const int y)
 // Modulous modify a pixel. Discards alpha. Great for pixel shading
 static uint32_t mod(const uint32_t pixel, const int shade)
 {
-    const uint32_t r = (((pixel >> 0x10) /****/) * shade) >> 0x08; // Shift right by 0x08 is same as
-    const uint32_t g = (((pixel >> 0x08) & 0xFF) * shade) >> 0x08; // dividing by 256. Somehow
-    const uint32_t b = (((pixel /*****/) & 0xFF) * shade) >> 0x08; // ofast was not catching this.
+    // Shift right by 0x08 is same as dividing by 256. Somehow -ofast was not catching this.
+    const uint32_t r = (((pixel >> 0x10) /****/) * shade) >> 0x08;
+    const uint32_t g = (((pixel >> 0x08) & 0xFF) * shade) >> 0x08;
+    const uint32_t b = (((pixel /*****/) & 0xFF) * shade) >> 0x08;
     return r << 0x10 | g << 0x08 | b;
 }
 
@@ -414,8 +425,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
     for(int y = y0; y <= y1; y++)
     {
         const Vertex bc = tbc(t.vew, x, y);
-        // Remember that the canvas is rotated 90 degrees
-        // so the everything  x and y are flipped here.
+        // Remember that the canvas is rotated 90 degrees so the everything  x and y are flipped here.
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
             // Notice the 90 degree rotation between a, b, and c such that the order is b, c, a.
