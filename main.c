@@ -122,7 +122,7 @@ static Vertices vsnew(const int max)
     return vs;
 }
 
-static Vertices vsload(FILE* const file, const int lines)
+static Vertices vsvload(FILE* const file, const int lines)
 {
     Vertices vs = vsnew(128);
     for(int i = 0; i < lines; i++)
@@ -142,7 +142,7 @@ static Vertices vsload(FILE* const file, const int lines)
     return vs;
 }
 
-static Vertices vnload(FILE* const file, const int lines)
+static Vertices vsnload(FILE* const file, const int lines)
 {
     Vertices vs = vsnew(128);
     for(int i = 0; i < lines; i++)
@@ -162,7 +162,7 @@ static Vertices vnload(FILE* const file, const int lines)
     return vs;
 }
 
-static Vertices vtload(FILE* const file, const int lines)
+static Vertices vstload(FILE* const file, const int lines)
 {
     Vertices vs = vsnew(128);
     for(int i = 0; i < lines; i++)
@@ -549,9 +549,9 @@ int main()
     const int yres = 480;
     const int lines = ulns(obj);
     const Faces fs = fsload(obj, lines);
-    const Vertices vsv = vsload(obj, lines);
-    const Vertices vst = vtload(obj, lines);
-    const Vertices vsn = vnload(obj, lines);
+    const Vertices vsv = vsvload(obj, lines);
+    const Vertices vst = vstload(obj, lines);
+    const Vertices vsn = vsnload(obj, lines);
     const Triangles ts = tsgen(vsv, fs);
     const Triangles tt = ttgen(vst, fs);
     const Triangles tn = tngen(vsn, fs);
@@ -586,4 +586,5 @@ int main()
         schurn(sdl);
         spresent(sdl);
     }
+    // Let the OS free hoisted memory for a quick exit.
 }
