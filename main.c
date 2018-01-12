@@ -394,6 +394,15 @@ static Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
+// Modulous modify a pixel. Discards alpha. Great for pixel shading
+static uint32_t mod(const uint32_t pixel, const int shade)
+{
+    const uint32_t r = (((pixel >> 0x10) /****/) * shade) >> 0x08; // Shift right by 0x08 is same as
+    const uint32_t g = (((pixel >> 0x08) & 0xFF) * shade) >> 0x08; // dividing by 256. Somehow
+    const uint32_t b = (((pixel /*****/) & 0xFF) * shade) >> 0x08; // ofast was not catching this.
+    return r << 0x10 | g << 0x08 | b;
+}
+
 // Draws a triangle in its viewport (v) with normal indices (n). A lighting vertex (l) determines triangle shade. zbuffer is modified.
 static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Vertex lit, const Target t)
 {
@@ -415,8 +424,10 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 vdot(lit, t.nrm.c),
                 vdot(lit, t.nrm.a),
             };
-            if(vdot(bc, varying) > 0.0)
+            const float intensity = vdot(bc, varying);
+            if(intensity > 0.0)
             {
+                const int shade = 0xFF * intensity;
                 // Z-depth is triangle depth multiplied by barycenter weights.
                 const float z = bc.x * t.vew.a.z + bc.y * t.vew.b.z + bc.z * t.vew.c.z;
                 // Notice the 90 degree rotation between x and y.
@@ -428,7 +439,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                     const int yy = t.stex->h * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                     // y and x are flipped, but xx and yy are regular to image.
                     zbuff[y + x * yres] = z;
-                    pixel[y + x * yres] = pixels[xx + yy * t.stex->w];
+                    pixel[y + x * yres] = mod(pixels[xx + yy * t.stex->w], shade);
                 }
             }
         }
