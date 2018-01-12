@@ -1,6 +1,6 @@
 # gel
 
-Gel (Graphical Emulation Layer) aims to immitate the core of OpenGL 2.0 with less than 768 lines.
+Gel (Graphical Emulation Layer) aims to immitate the core of OpenGL 2.0 in 768 lines.
 
     make; ./gel
 
