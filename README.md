@@ -8,4 +8,4 @@ Rotate the screen with the mouse.
 
 Hit END to close the window.
 
-![screenshot](scrots/2018-01-11-181844_600x480_scrot.png)
+![screenshot](scrots/2018-01-12-143239_800x600_scrot.png)
