@@ -1,6 +1,6 @@
 # gel
 
-Gel (Graphical Emulation Layer) software renders N64 wavefront objects.
+Gel (Graphical Emulation Layer) is a N64 object software renderer.
 
     make; ./gel
 
