@@ -55,12 +55,6 @@ Sdl;
 
 typedef struct
 {
-    int x0, y0, x1, y1;
-}
-Box;
-
-typedef struct
-{
     float xt;
     float yt;
     float sens;
@@ -403,14 +397,12 @@ static Vertex tbc(const Triangle t, const int x, const int y)
 // Draws a triangle in its viewport (v) with normal indices (n). A lighting vertex (l) determines triangle shade. zbuffer is modified.
 static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Vertex lit, const Target t)
 {
-    const Box b = {
-        (int) fminf(t.vew.a.x, fminf(t.vew.b.x, t.vew.c.x)),
-        (int) fminf(t.vew.a.y, fminf(t.vew.b.y, t.vew.c.y)),
-        (int) fmaxf(t.vew.a.x, fmaxf(t.vew.b.x, t.vew.c.x)),
-        (int) fmaxf(t.vew.a.y, fmaxf(t.vew.b.y, t.vew.c.y)),
-    };
-    for(int x = b.x0; x <= b.x1; x++)
-    for(int y = b.y0; y <= b.y1; y++)
+    const int x0 = fminf(t.vew.a.x, fminf(t.vew.b.x, t.vew.c.x));
+    const int y0 = fminf(t.vew.a.y, fminf(t.vew.b.y, t.vew.c.y));
+    const int x1 = fmaxf(t.vew.a.x, fmaxf(t.vew.b.x, t.vew.c.x));
+    const int y1 = fmaxf(t.vew.a.y, fmaxf(t.vew.b.y, t.vew.c.y));
+    for(int x = x0; x <= x1; x++)
+    for(int y = y0; y <= y1; y++)
     {
         const Vertex bc = tbc(t.vew, x, y);
         // Remember that the canvas is rotated 90 degrees
