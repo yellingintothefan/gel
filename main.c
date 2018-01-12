@@ -68,6 +68,15 @@ typedef struct
 }
 Input;
 
+typedef struct
+{
+    Triangle vew;
+    Triangle nrm;
+    Triangle tex;
+    SDL_Surface* stex;
+}
+Target;
+
 static int ulns(FILE* const file)
 {
     int ch = EOF;
@@ -201,40 +210,46 @@ static Faces fsload(FILE* const file, const int lines)
     return fs;
 }
 
-// Vector subtraction.
 static Vertex vsub(const Vertex a, const Vertex b)
 {
-    const Vertex v = { a.x - b.x, a.y - b.y, a.z - b.z };
+    const Vertex v = {
+        a.x - b.x,
+        a.y - b.y,
+        a.z - b.z,
+    };
     return v;
 }
 
-// Vector cross product.
 static Vertex vcrs(const Vertex a, const Vertex b)
 {
-    const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+    const Vertex c = {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x,
+    };
     return c;
 }
 
-// Vector scalar multiplication.
 static Vertex vmul(const Vertex v, const float n)
 {
-    const Vertex m = { v.x * n, v.y * n, v.z * n };
+    const Vertex m = {
+        v.x * n,
+        v.y * n,
+        v.z * n,
+    };
     return m;
 }
 
-// Vector dot product.
 static float vdot(const Vertex a, const Vertex b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-// Vector length.
 static float vlen(const Vertex v)
 {
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-// Vector unit.
 static Vertex vunt(const Vertex v)
 {
     return vmul(v, 1.0 / vlen(v));
@@ -242,7 +257,9 @@ static Vertex vunt(const Vertex v)
 
 Triangles tsnew(const int count)
 {
-    const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * count), count };
+    const Triangles ts = {
+        (Triangle*) malloc(sizeof(Triangle) * count), count
+    };
     return ts;
 }
 
@@ -251,7 +268,11 @@ static Triangles tsgen(const Vertices vs, const Faces fs)
     Triangles ts = tsnew(fs.count);
     for(int i = 0; i < ts.count; i++)
     {
-        const Triangle t = { vs.vertex[fs.face[i].va], vs.vertex[fs.face[i].vb], vs.vertex[fs.face[i].vc] };
+        const Triangle t = {
+            vs.vertex[fs.face[i].va],
+            vs.vertex[fs.face[i].vb],
+            vs.vertex[fs.face[i].vc],
+        };
         ts.triangle[i] = t;
     }
     return ts;
@@ -262,7 +283,11 @@ static Triangles tngen(const Vertices vs, const Faces fs)
     Triangles ts = tsnew(fs.count);
     for(int i = 0; i < fs.count; i++)
     {
-        const Triangle t = { vs.vertex[fs.face[i].na], vs.vertex[fs.face[i].nb], vs.vertex[fs.face[i].nc] };
+        const Triangle t = {
+            vs.vertex[fs.face[i].na],
+            vs.vertex[fs.face[i].nb],
+            vs.vertex[fs.face[i].nc],
+        };
         ts.triangle[i] = t;
     }
     return ts;
@@ -273,7 +298,11 @@ static Triangles ttgen(const Vertices vs, const Faces fs)
     Triangles ts = tsnew(fs.count);
     for(int i = 0; i < fs.count; i++)
     {
-        const Triangle t = { vs.vertex[fs.face[i].ta], vs.vertex[fs.face[i].tb], vs.vertex[fs.face[i].tc] };
+        const Triangle t = {
+            vs.vertex[fs.face[i].ta],
+            vs.vertex[fs.face[i].tb],
+            vs.vertex[fs.face[i].tc],
+        };
         ts.triangle[i] = t;
     }
     return ts;
@@ -349,7 +378,6 @@ static Triangle tpersp(const Triangle t)
     return p;
 }
 
-// Triangle barycentric coordinates.
 static Vertex tbc(const Triangle t, const int x, const int y)
 {
     const Vertex p = { (float) x, (float) y, 0.0 };
@@ -369,39 +397,42 @@ static Vertex tbc(const Triangle t, const int x, const int y)
 }
 
 // Draws a triangle in its viewport (v) with normal indices (n). A lighting vertex (l) determines triangle shade. zbuffer is modified.
-static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Triangle vew, const Triangle nrm, const Triangle tex, const Vertex lit, SDL_Surface* const stex)
+static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, const Vertex lit, const Target t)
 {
     const Box b = {
-        (int) fminf(vew.a.x, fminf(vew.b.x, vew.c.x)),
-        (int) fminf(vew.a.y, fminf(vew.b.y, vew.c.y)),
-        (int) fmaxf(vew.a.x, fmaxf(vew.b.x, vew.c.x)),
-        (int) fmaxf(vew.a.y, fmaxf(vew.b.y, vew.c.y)),
+        (int) fminf(t.vew.a.x, fminf(t.vew.b.x, t.vew.c.x)),
+        (int) fminf(t.vew.a.y, fminf(t.vew.b.y, t.vew.c.y)),
+        (int) fmaxf(t.vew.a.x, fmaxf(t.vew.b.x, t.vew.c.x)),
+        (int) fmaxf(t.vew.a.y, fmaxf(t.vew.b.y, t.vew.c.y)),
     };
     for(int x = b.x0; x <= b.x1; x++)
     for(int y = b.y0; y <= b.y1; y++)
     {
-        const Vertex bc = tbc(vew, x, y);
+        const Vertex bc = tbc(t.vew, x, y);
         // Remember that the canvas is rotated 90 degrees
         // so the everything  x and y are flipped here.
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
             // Notice the 90 degree rotation between a, b, and c such that the order is b, c, a.
-            const Vertex varying = { vdot(lit, nrm.b), vdot(lit, nrm.c), vdot(lit, nrm.a) };
-            const float brightness = vdot(bc, varying);
-            if(brightness > 0.0)
+            const Vertex varying = {
+                vdot(lit, t.nrm.b),
+                vdot(lit, t.nrm.c),
+                vdot(lit, t.nrm.a),
+            };
+            if(vdot(bc, varying) > 0.0)
             {
                 // Z-depth is triangle depth multiplied by barycenter weights.
-                const float z = bc.x * vew.a.z + bc.y * vew.b.z + bc.z * vew.c.z;
+                const float z = bc.x * t.vew.a.z + bc.y * t.vew.b.z + bc.z * t.vew.c.z;
                 // Notice the 90 degree rotation between x and y.
                 if(z > zbuff[y + x * yres])
                 {
-                    const uint32_t* const pixels = (uint32_t*) stex->pixels;
-                    // Once again, a, b, and c are rotate here to b, c, a.
-                    const int xx = stex->w * (1.0 - (bc.x * tex.b.x + bc.y * tex.c.x + bc.z * tex.a.x));
-                    const int yy = stex->h * (1.0 - (bc.x * tex.b.y + bc.y * tex.c.y + bc.z * tex.a.y));
+                    const uint32_t* const pixels = (uint32_t*) t.stex->pixels;
+                    // Once again, a, b, and c are rotate here t.to b, c, a.
+                    const int xx = t.stex->w * (1.0 - (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
+                    const int yy = t.stex->h * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                     // y and x are flipped, but xx and yy are regular to image.
                     zbuff[y + x * yres] = z;
-                    pixel[y + x * yres] = pixels[xx + yy * stex->w];
+                    pixel[y + x * yres] = pixels[xx + yy * t.stex->w];
                 }
             }
         }
@@ -424,7 +455,11 @@ static Triangle tviewt(const Triangle t, const Vertex x, const Vertex y, const V
 
 static Triangle tu(const Triangle t)
 {
-    const Triangle u = { vunt(t.a), vunt(t.b), vunt(t.c) };
+    const Triangle u = {
+        vunt(t.a),
+        vunt(t.b),
+        vunt(t.c),
+    };
     return u;
 }
 
@@ -455,12 +490,6 @@ static Input ipump(Input input)
     input.xt -= input.sens * dx;
     input.yt += input.sens * dy;
     return input;
-}
-
-static Vertex ieye(const Input input)
-{
-    const Vertex e = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
-    return e;
 }
 
 static void reset(float* const zbuff, uint32_t* const pixel, const int size)
@@ -523,7 +552,11 @@ int main()
         const Vertex lit = { 0.0, 0.0, 1.0 };
         const Vertex ctr = { 0.0, 0.0, 0.0 };
         const Vertex ups = { 0.0, 1.0, 0.0 };
-        const Vertex eye = ieye(input);
+        const Vertex eye = {
+            sinf(input.xt),
+            sinf(input.yt),
+            cosf(input.xt),
+        };
         const Vertex z = vunt(vsub(eye, ctr));
         const Vertex x = vunt(vcrs(ups, z));
         const Vertex y = vcrs(z, x);
@@ -534,8 +567,8 @@ int main()
             const Triangle tri = tviewt(ts.triangle[i], x, y, z, eye);
             const Triangle per = tpersp(tri);
             const Triangle vew = tviewport(per, sdl);
-            // Good golly, look at all these argumuents.
-            tdraw(yres, pixel, zbuff, vew, nrm, tex, lit, dif);
+            const Target targ = { vew, nrm, tex, dif };
+            tdraw(yres, pixel, zbuff, lit, targ);
         }
         sunlock(sdl);
         schurn(sdl);
