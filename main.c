@@ -206,7 +206,7 @@ static Vertex vunit(const Vertex v)
     return vmul(v, 1.0f / vlen(v));
 }
 
-static Triangle tunt(const Triangle t)
+static Triangle tunit(const Triangle t)
 {
     const Triangle u = { vunit(t.a), vunit(t.b), vunit(t.c) };
     return u;
@@ -226,7 +226,7 @@ static Triangles tsnew(const int count)
 
 static float vmaxlen(const Vertices vsv)
 {
-    float max = 0.0;
+    float max = 0.0f;
     for(int i = 0; i < vsv.count; i++)
         if(vlen(vsv.vertex[i]) > max)
             max = vlen(vsv.vertex[i]);
@@ -244,7 +244,7 @@ static Triangles tvgen(const Obj obj)
             obj.vsv.vertex[obj.fs.face[i].vb],
             obj.vsv.vertex[obj.fs.face[i].vc],
         };
-        tv.triangle[i] = tmul(t, 1.0 / scale);
+        tv.triangle[i] = tmul(t, 1.0f / scale);
     }
     return tv;
 }
@@ -322,10 +322,10 @@ static uint32_t* slock(const Sdl sdl)
 
 static Triangle tviewport(const Triangle t, const Sdl sdl)
 {
-    const float w = sdl.yres / 1.5;
-    const float h = sdl.yres / 1.5;
-    const float x = sdl.xres / 2.0;
-    const float y = sdl.yres / 4.0;
+    const float w = sdl.yres / 1.5f;
+    const float h = sdl.yres / 1.5f;
+    const float x = sdl.xres / 2.0f;
+    const float y = sdl.yres / 4.0f;
     const Triangle v = {
         { w * t.a.x + x, h * t.a.y + y, (t.a.z + 1.0f) / 1.5f },
         { w * t.b.x + x, h * t.b.y + y, (t.b.z + 1.0f) / 1.5f },
@@ -336,7 +336,7 @@ static Triangle tviewport(const Triangle t, const Sdl sdl)
 
 static Triangle tpersp(const Triangle t)
 {
-    const float c = 3.0;
+    const float c = 3.0f;
     const float za = 1.0f - t.a.z / c;
     const float zb = 1.0f - t.b.z / c;
     const float zc = 1.0f - t.c.z / c;
@@ -350,7 +350,7 @@ static Triangle tpersp(const Triangle t)
 
 static Vertex tbarycenter(const Triangle t, const int x, const int y)
 {
-    const Vertex p = { (float) x, (float) y, 0.0 };
+    const Vertex p = { (float) x, (float) y, 0.0f };
     const Vertex v0 = vsub(t.b, t.a);
     const Vertex v1 = vsub(t.c, t.a);
     const Vertex v2 = vsub(p, t.a);
@@ -386,18 +386,18 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
         const Vertex bc = tbarycenter(t.vew, x, y);
         if(bc.x >= 0.0f && bc.y >= 0.0f && bc.z >= 0.0f)
         {
-            // But everything else here is rotated 90 degrees to accomodate a fast render cache.
+            // Barycenter above is upwards. Everything below rotated 90 degrees to accomodate sideways renderer.
             const float z = bc.x * t.vew.b.z + bc.y * t.vew.c.z + bc.z * t.vew.a.z;
             if(z > zbuff[y + x * yres])
             {
-                const Vertex light = { 0.0, 0.0, 1.0 };
+                const Vertex light = { 0.0f, 0.0f, 1.0f };
                 const Vertex varying = { vdot(light, t.nrm.b), vdot(light, t.nrm.c), vdot(light, t.nrm.a) };
                 const uint32_t* const pixels = (uint32_t*) t.fdif->pixels;
                 const int xx = (t.fdif->w - 1) * (0.0f + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
                 const int yy = (t.fdif->h - 1) * (1.0f - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                 const float intensity = vdot(bc, varying);
                 const int shading = 0xFF * (intensity < 0.0f ? 0.0f : intensity);
-                // Again, notice the rotated renderer (destination) but right side up image (source).
+                // Image is upwards contrary to sideways renderer.
                 zbuff[y + x * yres] = z;
                 pixel[y + x * yres] = pshade(pixels[xx + yy * t.fdif->w], shading);
             }
@@ -422,12 +422,12 @@ static Triangle tviewnrm(const Triangle n, const Vertex x, const Vertex y, const
         { vdot(n.b, x), vdot(n.b, y), vdot(n.b, z) },
         { vdot(n.c, x), vdot(n.c, y), vdot(n.c, z) },
     };
-    return tunt(o);
+    return tunit(o);
 }
 
 static Input iinit()
 {
-    const Input input = { 0.0, 0.0, 0.005, SDL_GetKeyboardState(NULL) };
+    const Input input = { 0.0f, 0.0f, 0.005f, SDL_GetKeyboardState(NULL) };
     SDL_SetRelativeMouseMode(SDL_FALSE);
     return input;
 }
@@ -488,8 +488,8 @@ int main()
     {
         uint32_t* const pixel = slock(sdl);
         reset(zbuff, pixel, sdl.xres * sdl.yres);
-        const Vertex ctr = { 0.0, 0.0, 0.0 };
-        const Vertex ups = { 0.0, 1.0, 0.0 };
+        const Vertex ctr = { 0.0f, 0.0f, 0.0f };
+        const Vertex ups = { 0.0f, 1.0f, 0.0f };
         const Vertex eye = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
         const Vertex z = vunit(vsub(eye, ctr));
         const Vertex x = vunit(vcross(ups, z));
