@@ -137,24 +137,21 @@ static Obj oparse(FILE* const file)
             sscanf(line, "vn %f %f %f", &v.x, &v.y, &v.z);
             vsn.vertex[vsn.count++] = v;
         }
-        else
-        if(line[0] == 'v' && line[1] == 't')
+        else if(line[0] == 'v' && line[1] == 't')
         {
             if(vst.count == vst.max)
                 vst.vertex = (Vertex*) realloc(vst.vertex, sizeof(Vertex) * (vst.max *= 2));
             sscanf(line, "vt %f %f %f", &v.x, &v.y, &v.z);
             vst.vertex[vst.count++] = v;
         }
-        else
-        if(line[0] == 'v')
+        else if(line[0] == 'v')
         {
             if(vsv.count == vsv.max)
                 vsv.vertex = (Vertex*) realloc(vsv.vertex, sizeof(Vertex) * (vsv.max *= 2));
             sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
             vsv.vertex[vsv.count++] = v;
         }
-        else
-        if(line[0] == 'f')
+        else if(line[0] == 'f')
         {
             if(fs.count == fs.max)
                 fs.face = (Face*) realloc(fs.face, sizeof(Face) * (fs.max *= 2));
@@ -196,7 +193,7 @@ static float vdot(const Vertex a, const Vertex b)
 
 static float vlen(const Vertex v)
 {
-    return sqrtf( v.x * v.x + v.y * v.y + v.z * v.z);
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 static Vertex vunt(const Vertex v)
@@ -204,13 +201,19 @@ static Vertex vunt(const Vertex v)
     return vmul(v, 1.0 / vlen(v));
 }
 
-static Triangle tu(const Triangle t)
+static Triangle tunt(const Triangle t)
 {
     const Triangle u = { vunt(t.a), vunt(t.b), vunt(t.c) };
     return u;
 }
 
-Triangles tsnew(const int count)
+static Triangle tmul(const Triangle t, const float scale)
+{
+    const Triangle s = { vmul(t.a, scale), vmul(t.b, scale), vmul(t.c, scale) };
+    return s;
+}
+
+static Triangles tsnew(const int count)
 {
     const Triangles ts = { (Triangle*) malloc(sizeof(Triangle) * count), count };
     return ts;
@@ -223,12 +226,6 @@ static float vmaxlen(const Vertices vsv)
         if(vlen(vsv.vertex[i]) > max)
             max = vlen(vsv.vertex[i]);
     return max;
-}
-
-static Triangle tmul(const Triangle t, const float scale)
-{
-    const Triangle s = { vmul(t.a, scale), vmul(t.b, scale), vmul(t.c, scale) };
-    return s;
 }
 
 static Triangles tvgen(const Obj obj)
@@ -363,7 +360,7 @@ static Vertex tbc(const Triangle t, const int x, const int y)
     return vertex;
 }
 
-static uint32_t shade(const uint32_t pixel, const int shading)
+static uint32_t pshade(const uint32_t pixel, const int shading)
 {
     const uint32_t r = (((pixel >> 0x10) /****/) * shading) >> 0x08;
     const uint32_t g = (((pixel >> 0x08) & 0xFF) * shading) >> 0x08;
@@ -394,13 +391,13 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 const float intensity = vdot(bc, varying);
                 const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
                 zbuff[y + x * yres] = z;
-                pixel[y + x * yres] = shade(pixels[xx + yy * t.fdif->w], shading);
+                pixel[y + x * yres] = pshade(pixels[xx + yy * t.fdif->w], shading);
             }
         }
     }
 }
 
-static Triangle tviewt(const Triangle t, const Vertex x, const Vertex y, const Vertex z, const Vertex eye)
+static Triangle tviewtri(const Triangle t, const Vertex x, const Vertex y, const Vertex z, const Vertex eye)
 {
     const Triangle o = {
         { vdot(t.a, x) - vdot(x, eye), vdot(t.a, y) - vdot(y, eye), vdot(t.a, z) - vdot(z, eye) },
@@ -410,14 +407,14 @@ static Triangle tviewt(const Triangle t, const Vertex x, const Vertex y, const V
     return o;
 }
 
-static Triangle tviewn(const Triangle n, const Vertex x, const Vertex y, const Vertex z)
+static Triangle tviewnrm(const Triangle n, const Vertex x, const Vertex y, const Vertex z)
 {
     const Triangle o = {
         { vdot(n.a, x), vdot(n.a, y), vdot(n.a, z) },
         { vdot(n.b, x), vdot(n.b, y), vdot(n.b, z) },
         { vdot(n.c, x), vdot(n.c, y), vdot(n.c, z) },
     };
-    return tu(o);
+    return tunt(o);
 }
 
 static Input iinit()
@@ -491,11 +488,11 @@ int main()
         const Vertex y = vcrs(z, x);
         for(int i = 0; i < tv.count; i++)
         {
-            const Triangle nrm = tviewn(tn.triangle[i], x, y, z);
+            const Triangle nrm = tviewnrm(tn.triangle[i], x, y, z);
             const Triangle tex = tt.triangle[i];
-            const Triangle tri = tviewt(tv.triangle[i], x, y, z, eye);
+            const Triangle tri = tviewtri(tv.triangle[i], x, y, z, eye);
             const Triangle per = tpersp(tri);
-            const Triangle vew = tviewport(input.key[SDL_SCANCODE_Q] ? tri : per, sdl);
+            const Triangle vew = tviewport(per, sdl);
             const Target targ = { vew, nrm, tex, fdif };
             tdraw(sdl.yres, pixel, zbuff, targ);
         }
