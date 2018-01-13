@@ -471,8 +471,8 @@ static FILE* oload(const char* const path)
 
 int main()
 {
-    FILE* const fobj = oload("model/anju.obj");
-    SDL_Surface* const fdif = sload("model/anju.bmp");
+    FILE* const fobj = oload("model/saria.obj");
+    SDL_Surface* const fdif = sload("model/saria.bmp");
     const Obj obj = oparse(fobj);
     const Triangles tv = tvgen(obj);
     const Triangles tt = ttgen(obj);
