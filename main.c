@@ -16,7 +16,9 @@ Vertices;
 
 typedef struct
 {
-    int va, vb, vc, ta, tb, tc, na, nb, nc;
+    int va, vb, vc;
+    int ta, tb, tc;
+    int na, nb, nc;
 }
 Face;
 
@@ -157,7 +159,9 @@ static Obj oparse(FILE* const file)
                 fs.face = (Face*) realloc(fs.face, sizeof(Face) * (fs.max *= 2));
             sscanf(line, "f %d/%d/%d %d/%d/%d %d/%d/%d", &f.va, &f.ta, &f.na, &f.vb, &f.tb, &f.nb, &f.vc, &f.tc, &f.nc);
             const Face indexed = {
-                f.va - 1, f.vb - 1, f.vc - 1, f.ta - 1, f.tb - 1, f.tc - 1, f.na - 1, f.nb - 1, f.nc - 1
+                f.va - 1, f.vb - 1, f.vc - 1,
+                f.ta - 1, f.tb - 1, f.tc - 1,
+                f.na - 1, f.nb - 1, f.nc - 1
             };
             fs.face[fs.count++] = indexed;
         }
@@ -174,7 +178,7 @@ static Vertex vsub(const Vertex a, const Vertex b)
     return v;
 }
 
-static Vertex vcrs(const Vertex a, const Vertex b)
+static Vertex vcross(const Vertex a, const Vertex b)
 {
     const Vertex c = { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
     return c;
@@ -196,14 +200,14 @@ static float vlen(const Vertex v)
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-static Vertex vunt(const Vertex v)
+static Vertex vunit(const Vertex v)
 {
     return vmul(v, 1.0 / vlen(v));
 }
 
 static Triangle tunt(const Triangle t)
 {
-    const Triangle u = { vunt(t.a), vunt(t.b), vunt(t.c) };
+    const Triangle u = { vunit(t.a), vunit(t.b), vunit(t.c) };
     return u;
 }
 
@@ -295,6 +299,7 @@ static Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
     sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
+    // Notice the flip between xres and yres - the renderer is on its side to maximize cache effeciency.
     sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
@@ -342,7 +347,7 @@ static Triangle tpersp(const Triangle t)
     return p;
 }
 
-static Vertex tbc(const Triangle t, const int x, const int y)
+static Vertex tbarycenter(const Triangle t, const int x, const int y)
 {
     const Vertex p = { (float) x, (float) y, 0.0 };
     const Vertex v0 = vsub(t.b, t.a);
@@ -377,9 +382,11 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
     for(int x = x0; x <= x1; x++)
     for(int y = y0; y <= y1; y++)
     {
-        const Vertex bc = tbc(t.vew, x, y);
+        // Coordinate system is upwards.
+        const Vertex bc = tbarycenter(t.vew, x, y);
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
+            // But everything else here is rotated 90 degrees to accomodate a fast render cache.
             const float z = bc.x * t.vew.b.z + bc.y * t.vew.c.z + bc.z * t.vew.a.z;
             if(z > zbuff[y + x * yres])
             {
@@ -390,6 +397,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 const int yy = (t.fdif->h - 1) * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                 const float intensity = vdot(bc, varying);
                 const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
+                // Again, notice the rotated renderer (destination) but right side up image (source).
                 zbuff[y + x * yres] = z;
                 pixel[y + x * yres] = pshade(pixels[xx + yy * t.fdif->w], shading);
             }
@@ -483,9 +491,9 @@ int main()
         const Vertex ctr = { 0.0, 0.0, 0.0 };
         const Vertex ups = { 0.0, 1.0, 0.0 };
         const Vertex eye = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
-        const Vertex z = vunt(vsub(eye, ctr));
-        const Vertex x = vunt(vcrs(ups, z));
-        const Vertex y = vcrs(z, x);
+        const Vertex z = vunit(vsub(eye, ctr));
+        const Vertex x = vunit(vcross(ups, z));
+        const Vertex y = vcross(z, x);
         for(int i = 0; i < tv.count; i++)
         {
             const Triangle nrm = tviewnrm(tn.triangle[i], x, y, z);
@@ -500,4 +508,5 @@ int main()
         schurn(sdl);
         spresent(sdl);
     }
+    // Let the OS free hoisted memory for a quick exit.
 }

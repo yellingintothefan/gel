@@ -1,6 +1,6 @@
 # gel
 
-Gel (Graphical Emulation Layer) is a N64 object software renderer with a 512 line limit.
+Gel (Graphical Emulation Layer) is a N64 object software renderer in 512 lines.
 
     make; ./gel
 
