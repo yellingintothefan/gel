@@ -386,8 +386,8 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 const Vertex light = { 0.0, 0.0, 1.0 };
                 const Vertex varying = { vdot(light, t.nrm.b), vdot(light, t.nrm.c), vdot(light, t.nrm.a) };
                 const uint32_t* const pixels = (uint32_t*) t.fdif->pixels;
-                const int xx = t.fdif->w * (0.0 + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
-                const int yy = t.fdif->h * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
+                const int xx = (t.fdif->w - 1) * (0.0 + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
+                const int yy = (t.fdif->h - 1) * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                 const float intensity = vdot(bc, varying);
                 const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
                 zbuff[y + x * yres] = z;
@@ -468,8 +468,8 @@ static FILE* oload(const char* const path)
 
 int main()
 {
-    FILE* const fobj = oload("model/saria.obj");
-    SDL_Surface* const fdif = sload("model/saria.bmp");
+    FILE* const fobj = oload("model/salesman.obj");
+    SDL_Surface* const fdif = sload("model/salesman.bmp");
     const Obj obj = oparse(fobj);
     const Triangles tv = tvgen(obj);
     const Triangles tt = ttgen(obj);
