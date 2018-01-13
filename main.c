@@ -1,5 +1,7 @@
 #include <SDL2/SDL.h>
 
+#define FLT_MAX 0xFFFF
+
 typedef struct
 {
     float x, y, z;
