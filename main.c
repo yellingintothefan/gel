@@ -451,8 +451,11 @@ static void reset(float* const zbuff, uint32_t* const pixel, const int size)
         zbuff[i] = -FLT_MAX, pixel[i] = 0x0;
 }
 
-static SDL_Surface* sload(const char* const path)
+static SDL_Surface* sload(const char* const nobj)
 {
+    char path[512] = {0};
+    snprintf(path, sizeof(path), "model/%s.bmp", nobj);
+    //printf("path: %s\n", path);
     SDL_Surface* const bmp = SDL_LoadBMP(path);
     if(bmp == NULL)
     {
@@ -466,8 +469,11 @@ static SDL_Surface* sload(const char* const path)
     return converted;
 }
 
-static FILE* oload(const char* const path)
+static FILE* oload(const char* const nobj)
 {
+    char path[512] = {0};
+    snprintf(path, sizeof(path), "model/%s.obj", nobj);
+    //printf("path: %s\n", path);
     FILE* const file = fopen(path, "r");
     if(file == NULL)
     {
@@ -479,23 +485,12 @@ static FILE* oload(const char* const path)
 
 int main(int argc, char* argv[])
 {
-    FILE* fobj;
-    SDL_Surface* fdif;
-    if (argc > 1)
-    {
-        fobj = oload(argv[1]);
-        
-        char buffer[512] = {0};
-        strncpy(buffer, argv[1], strlen(argv[1])-3);
-        strcpy(buffer + strlen(argv[1])-3, "bmp");
-        //printf("buffer: %s\n", buffer);
-        fdif = sload(buffer);
-    }
-    else
-    {
-        fobj = oload("model/salesman.obj");        
-        fdif = sload("model/salesman.bmp");
-    }
+    const char* nobj = "salesman";
+    
+    if (argc > 1) nobj = argv[1];
+    
+    FILE* const fobj = oload(nobj);
+    SDL_Surface* const fdif = sload(nobj);
     
     const Obj obj = oparse(fobj);
     const Triangles tv = tvgen(obj);
