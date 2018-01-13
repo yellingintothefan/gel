@@ -508,5 +508,5 @@ int main()
         schurn(sdl);
         spresent(sdl);
     }
-    // Let the OS free hoisted memory for a quick exit.
+    // Let the OS free hosted memory for a quick exit.
 }
