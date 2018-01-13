@@ -383,7 +383,6 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
     for(int x = x0; x <= x1; x++)
     for(int y = y0; y <= y1; y++)
     {
-        // Coordinate system is upwards.
         const Vertex bc = tbarycenter(t.vew, x, y);
         if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
         {
