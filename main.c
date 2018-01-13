@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <float.h>
 
 typedef struct
 {
