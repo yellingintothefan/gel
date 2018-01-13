@@ -207,7 +207,7 @@ static Obj oparse(FILE* const file)
             vst.vertex[vst.count++] = v;
         }
         else
-        if(line[0] == 'v' && line[1] != 't' && line[1] != 'n')
+        if(line[0] == 'v')
         {
             if(vsv.count == vsv.max)
                 vsv.vertex = (Vertex*) realloc(vsv.vertex, sizeof(Vertex) * (vsv.max *= 2));
