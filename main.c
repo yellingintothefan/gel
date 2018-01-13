@@ -203,7 +203,7 @@ static float vlen(const Vertex v)
 
 static Vertex vunit(const Vertex v)
 {
-    return vmul(v, 1.0 / vlen(v));
+    return vmul(v, 1.0f / vlen(v));
 }
 
 static Triangle tunt(const Triangle t)
@@ -327,9 +327,9 @@ static Triangle tviewport(const Triangle t, const Sdl sdl)
     const float x = sdl.xres / 2.0;
     const float y = sdl.yres / 4.0;
     const Triangle v = {
-        { w * t.a.x + x, h * t.a.y + y, (t.a.z + 1.0) / 1.5 },
-        { w * t.b.x + x, h * t.b.y + y, (t.b.z + 1.0) / 1.5 },
-        { w * t.c.x + x, h * t.c.y + y, (t.c.z + 1.0) / 1.5 },
+        { w * t.a.x + x, h * t.a.y + y, (t.a.z + 1.0f) / 1.5f },
+        { w * t.b.x + x, h * t.b.y + y, (t.b.z + 1.0f) / 1.5f },
+        { w * t.c.x + x, h * t.c.y + y, (t.c.z + 1.0f) / 1.5f },
     };
     return v;
 }
@@ -337,9 +337,9 @@ static Triangle tviewport(const Triangle t, const Sdl sdl)
 static Triangle tpersp(const Triangle t)
 {
     const float c = 3.0;
-    const float za = 1.0 - t.a.z / c;
-    const float zb = 1.0 - t.b.z / c;
-    const float zc = 1.0 - t.c.z / c;
+    const float za = 1.0f - t.a.z / c;
+    const float zb = 1.0f - t.b.z / c;
+    const float zc = 1.0f - t.c.z / c;
     const Triangle p = {
         { t.a.x / za, t.a.y / za, t.a.z / za },
         { t.b.x / zb, t.b.y / zb, t.b.z / zb },
@@ -361,7 +361,7 @@ static Vertex tbarycenter(const Triangle t, const int x, const int y)
     const float d21 = vdot(v2, v1);
     const float v = (d11 * d20 - d01 * d21) / (d00 * d11 - d01 * d01);
     const float w = (d00 * d21 - d01 * d20) / (d00 * d11 - d01 * d01);
-    const float u = 1.0 - v - w;
+    const float u = 1.0f - v - w;
     const Vertex vertex = { v, w, u };
     return vertex;
 }
@@ -384,7 +384,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
     for(int y = y0; y <= y1; y++)
     {
         const Vertex bc = tbarycenter(t.vew, x, y);
-        if(bc.x >= 0.0 && bc.y >= 0.0 && bc.z >= 0.0)
+        if(bc.x >= 0.0f && bc.y >= 0.0f && bc.z >= 0.0f)
         {
             // But everything else here is rotated 90 degrees to accomodate a fast render cache.
             const float z = bc.x * t.vew.b.z + bc.y * t.vew.c.z + bc.z * t.vew.a.z;
@@ -393,10 +393,10 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 const Vertex light = { 0.0, 0.0, 1.0 };
                 const Vertex varying = { vdot(light, t.nrm.b), vdot(light, t.nrm.c), vdot(light, t.nrm.a) };
                 const uint32_t* const pixels = (uint32_t*) t.fdif->pixels;
-                const int xx = (t.fdif->w - 1) * (0.0 + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
-                const int yy = (t.fdif->h - 1) * (1.0 - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
+                const int xx = (t.fdif->w - 1) * (0.0f + (bc.x * t.tex.b.x + bc.y * t.tex.c.x + bc.z * t.tex.a.x));
+                const int yy = (t.fdif->h - 1) * (1.0f - (bc.x * t.tex.b.y + bc.y * t.tex.c.y + bc.z * t.tex.a.y));
                 const float intensity = vdot(bc, varying);
-                const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
+                const int shading = 0xFF * (intensity < 0.0f ? 0.0f : intensity);
                 // Again, notice the rotated renderer (destination) but right side up image (source).
                 zbuff[y + x * yres] = z;
                 pixel[y + x * yres] = pshade(pixels[xx + yy * t.fdif->w], shading);
