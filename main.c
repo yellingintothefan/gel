@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+
 #include <SDL2/SDL.h>
 
 typedef struct
@@ -474,10 +477,26 @@ static FILE* oload(const char* const path)
     return file;
 }
 
-int main()
+int main(int argc, char* argv[])
 {
-    FILE* const fobj = oload("model/salesman.obj");
-    SDL_Surface* const fdif = sload("model/salesman.bmp");
+    FILE* fobj;
+    SDL_Surface* fdif;
+    if (argc > 1)
+    {
+        fobj = oload(argv[1]);
+        
+        char buffer[512] = {0};
+        strncpy(buffer, argv[1], strlen(argv[1])-3);
+        strcpy(buffer + strlen(argv[1])-3, "bmp");
+        //printf("buffer: %s\n", buffer);
+        fdif = sload(buffer);
+    }
+    else
+    {
+        fobj = oload("model/salesman.obj");        
+        fdif = sload("model/salesman.bmp");
+    }
+    
     const Obj obj = oparse(fobj);
     const Triangles tv = tvgen(obj);
     const Triangles tt = ttgen(obj);
