@@ -68,6 +68,15 @@ Faces;
 
 typedef struct
 {
+    Vertices vsv;
+    Vertices vsn;
+    Vertices vst;
+    Faces fs;
+}
+Obj;
+
+typedef struct
+{
     int x0;
     int y0;
     int x1;
@@ -95,7 +104,7 @@ typedef struct
     Triangle vew;
     Triangle nrm;
     Triangle tex;
-    SDL_Surface* dif;
+    SDL_Surface* fdif;
 }
 Target;
 
@@ -159,66 +168,6 @@ static Vertices vsnew(const int max)
     return vs;
 }
 
-static Vertices vsvload(FILE* const file, const int lines)
-{
-    Vertices vs = vsnew(128);
-    for(int i = 0; i < lines; i++)
-    {
-        char* line = ureadln(file);
-        if(line[0] == 'v' && line[1] != 't' && line[1] != 'n')
-        {
-            if(vs.count == vs.max)
-                vs.vertex = (Vertex*) realloc(vs.vertex, sizeof(Vertex) * (vs.max *= 2));
-            Vertex v;
-            sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
-            vs.vertex[vs.count++] = v;
-        }
-        free(line);
-    }
-    rewind(file);
-    return vs;
-}
-
-static Vertices vsnload(FILE* const file, const int lines)
-{
-    Vertices vs = vsnew(128);
-    for(int i = 0; i < lines; i++)
-    {
-        char* line = ureadln(file);
-        if(line[0] == 'v' && line[1] == 'n')
-        {
-            if(vs.count == vs.max)
-                vs.vertex = (Vertex*) realloc(vs.vertex, sizeof(Vertex) * (vs.max *= 2));
-            Vertex v;
-            sscanf(line, "vn %f %f %f", &v.x, &v.y, &v.z);
-            vs.vertex[vs.count++] = v;
-        }
-        free(line);
-    }
-    rewind(file);
-    return vs;
-}
-
-static Vertices vstload(FILE* const file, const int lines)
-{
-    Vertices vs = vsnew(128);
-    for(int i = 0; i < lines; i++)
-    {
-        char* line = ureadln(file);
-        if(line[0] == 'v' && line[1] == 't')
-        {
-            if(vs.count == vs.max)
-                vs.vertex = (Vertex*) realloc(vs.vertex, sizeof(Vertex) * (vs.max *= 2));
-            Vertex v;
-            sscanf(line, "vt %f %f %f", &v.x, &v.y, &v.z);
-            vs.vertex[vs.count++] = v;
-        }
-        free(line);
-    }
-    rewind(file);
-    return vs;
-}
-
 static Faces fsnew(const int max)
 {
     const Faces fs = {
@@ -229,12 +178,44 @@ static Faces fsnew(const int max)
     return fs;
 }
 
-static Faces fsload(FILE* const file, const int lines)
+static Obj oparse(FILE* const file)
 {
-    Faces fs = fsnew(128);
+    const int lines = ulns(file);
+    const int size = 128;
+    Vertices vsv = vsnew(size);
+    Vertices vsn = vsnew(size);
+    Vertices vst = vsnew(size);
+    Faces fs = fsnew(size);
     for(int i = 0; i < lines; i++)
     {
         char* line = ureadln(file);
+        if(line[0] == 'v' && line[1] == 'n')
+        {
+            if(vsn.count == vsn.max)
+                vsn.vertex = (Vertex*) realloc(vsn.vertex, sizeof(Vertex) * (vsn.max *= 2));
+            Vertex v;
+            sscanf(line, "vn %f %f %f", &v.x, &v.y, &v.z);
+            vsn.vertex[vsn.count++] = v;
+        }
+        else
+        if(line[0] == 'v' && line[1] == 't')
+        {
+            if(vst.count == vst.max)
+                vst.vertex = (Vertex*) realloc(vst.vertex, sizeof(Vertex) * (vst.max *= 2));
+            Vertex v;
+            sscanf(line, "vt %f %f %f", &v.x, &v.y, &v.z);
+            vst.vertex[vst.count++] = v;
+        }
+        else
+        if(line[0] == 'v' && line[1] != 't' && line[1] != 'n')
+        {
+            if(vsv.count == vsv.max)
+                vsv.vertex = (Vertex*) realloc(vsv.vertex, sizeof(Vertex) * (vsv.max *= 2));
+            Vertex v;
+            sscanf(line, "v %f %f %f", &v.x, &v.y, &v.z);
+            vsv.vertex[vsv.count++] = v;
+        }
+        else
         if(line[0] == 'f')
         {
             if(fs.count == fs.max)
@@ -251,7 +232,8 @@ static Faces fsload(FILE* const file, const int lines)
         free(line);
     }
     rewind(file);
-    return fs;
+    const Obj obj = { vsv, vsn, vst, fs };
+    return obj;
 }
 
 static Vertex vsub(const Vertex a, const Vertex b)
@@ -324,49 +306,69 @@ Triangles tsnew(const int count)
     return ts;
 }
 
-static Triangles tsgen(const Vertices vs, const Faces fs, const float scale)
+static float vmaxlen(const Vertices vsv)
 {
-    Triangles ts = tsnew(fs.count);
-    for(int i = 0; i < ts.count; i++)
-    {
-        const Triangle t = {
-            vmul(vs.vertex[fs.face[i].va], 1.0 / scale),
-            vmul(vs.vertex[fs.face[i].vb], 1.0 / scale),
-            vmul(vs.vertex[fs.face[i].vc], 1.0 / scale),
-        };
-        ts.triangle[i] = t;
-    }
-    return ts;
+    float max = 0;
+    for(int i = 0; i < vsv.count; i++)
+        if(vlen(vsv.vertex[i]) > max)
+            max = vlen(vsv.vertex[i]);
+    return max;
 }
 
-static Triangles tngen(const Vertices vs, const Faces fs)
+static Triangle tmul(const Triangle t, const float scale)
 {
-    Triangles ts = tsnew(fs.count);
-    for(int i = 0; i < fs.count; i++)
-    {
-        const Triangle t = {
-            vs.vertex[fs.face[i].na],
-            vs.vertex[fs.face[i].nb],
-            vs.vertex[fs.face[i].nc],
-        };
-        ts.triangle[i] = t;
-    }
-    return ts;
+    const Triangle s = {
+        vmul(t.a, scale),
+        vmul(t.b, scale),
+        vmul(t.c, scale),
+    };
+    return s;
 }
 
-static Triangles ttgen(const Vertices vs, const Faces fs)
+static Triangles tvgen(const Obj obj)
 {
-    Triangles ts = tsnew(fs.count);
-    for(int i = 0; i < fs.count; i++)
+    const int scale = vmaxlen(obj.vsv);
+    Triangles tv = tsnew(obj.fs.count);
+    for(int i = 0; i < obj.fs.count; i++)
     {
         const Triangle t = {
-            vs.vertex[fs.face[i].ta],
-            vs.vertex[fs.face[i].tb],
-            vs.vertex[fs.face[i].tc],
+            obj.vsv.vertex[obj.fs.face[i].va],
+            obj.vsv.vertex[obj.fs.face[i].vb],
+            obj.vsv.vertex[obj.fs.face[i].vc],
         };
-        ts.triangle[i] = t;
+        tv.triangle[i] = tmul(t, 1.0 / scale);
     }
-    return ts;
+    return tv;
+}
+
+static Triangles tngen(const Obj obj)
+{
+    Triangles tn = tsnew(obj.fs.count);
+    for(int i = 0; i < obj.fs.count; i++)
+    {
+        const Triangle t = {
+            obj.vsn.vertex[obj.fs.face[i].na],
+            obj.vsn.vertex[obj.fs.face[i].nb],
+            obj.vsn.vertex[obj.fs.face[i].nc],
+        };
+        tn.triangle[i] = t;
+    }
+    return tn;
+}
+
+static Triangles ttgen(const Obj obj)
+{
+    Triangles tt = tsnew(obj.fs.count);
+    for(int i = 0; i < obj.fs.count; i++)
+    {
+        const Triangle t = {
+            obj.vst.vertex[obj.fs.face[i].ta],
+            obj.vst.vertex[obj.fs.face[i].tb],
+            obj.vst.vertex[obj.fs.face[i].tc],
+        };
+        tt.triangle[i] = t;
+    }
+    return tt;
 }
 
 static void spresent(const Sdl sdl)
@@ -516,16 +518,16 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                     vdot(light, t.nrm.c), // C
                     vdot(light, t.nrm.a), // A
                 };
-                const uint32_t* const pixels = (uint32_t*) t.dif->pixels;
+                const uint32_t* const pixels = (uint32_t*) t.fdif->pixels;
                 // Note: Once again, a, b, and c are rotate here to b, c, a.
-                const int xx = t.dif->w * (
+                const int xx = t.fdif->w * (
                     bc.x * t.tex.b.x + // B
                     bc.y * t.tex.c.x + // C
                     bc.z * t.tex.a.x); // A
                 // Same goes for the Y-coordinates.
                 // The image coordinate system starts bottom left, and renderer starts top left, so the
                 // final weight becomes 1.0 - weight.
-                const int yy = t.dif->h * (1.0 - (
+                const int yy = t.fdif->h * (1.0 - (
                     bc.x * t.tex.b.y +  // B
                     bc.y * t.tex.c.y +  // C
                     bc.z * t.tex.a.y)); // A
@@ -534,7 +536,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
                 const int shading = 0xFF * (intensity < 0.0 ? 0.0 : intensity);
                 // Y and X flipped again but XX and YY are not as the image is not on its side.
                 zbuff[y + x * yres] = z;
-                pixel[y + x * yres] = shade(pixels[xx + yy * t.dif->w], shading);
+                pixel[y + x * yres] = shade(pixels[xx + yy * t.fdif->w], shading);
             }
         }
     }
@@ -622,29 +624,16 @@ static FILE* oload(const char* const path)
     return file;
 }
 
-static float vmaxlen(const Vertices vsv)
-{
-    float max = 0;
-    for(int i = 0; i < vsv.count; i++)
-        if(vlen(vsv.vertex[i]) > max)
-            max = vlen(vsv.vertex[i]);
-    return max;
-}
-
 int main()
 {
-    FILE* const obj = oload("model/anju.obj");
-    SDL_Surface* const dif = sload("model/anju.bmp");
+    FILE* const fobj = oload("model/anju.obj");
+    SDL_Surface* const fdif = sload("model/anju.bmp");
     const int xres = 800;
     const int yres = 600;
-    const int lines = ulns(obj);
-    const Faces fs = fsload(obj, lines);
-    const Vertices vsv = vsvload(obj, lines);
-    const Vertices vst = vstload(obj, lines);
-    const Vertices vsn = vsnload(obj, lines);
-    const Triangles ts = tsgen(vsv, fs, vmaxlen(vsv));
-    const Triangles tt = ttgen(vst, fs);
-    const Triangles tn = tngen(vsn, fs);
+    const Obj obj = oparse(fobj);
+    const Triangles tv = tvgen(obj);
+    const Triangles tt = ttgen(obj);
+    const Triangles tn = tngen(obj);
     const Sdl sdl = ssetup(xres, yres);
     float* const zbuff = (float*) malloc(sizeof(float) * xres * yres);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
@@ -661,14 +650,14 @@ int main()
         const Vertex z = vunt(vsub(eye, ctr));
         const Vertex x = vunt(vcrs(ups, z));
         const Vertex y = vcrs(z, x);
-        for(int i = 0; i < ts.count; i++)
+        for(int i = 0; i < tv.count; i++)
         {
             const Triangle nrm = tviewn(tn.triangle[i], x, y, z);
             const Triangle tex = tt.triangle[i];
-            const Triangle tri = tviewt(ts.triangle[i], x, y, z, eye);
+            const Triangle tri = tviewt(tv.triangle[i], x, y, z, eye);
             const Triangle per = tpersp(tri);
             const Triangle vew = tviewport(input.key[SDL_SCANCODE_Q] ? tri : per, sdl);
-            const Target targ = { vew, nrm, tex, dif };
+            const Target targ = { vew, nrm, tex, fdif };
             tdraw(yres, pixel, zbuff, targ);
         }
         sunlock(sdl);
