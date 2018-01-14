@@ -17,9 +17,7 @@ Vertices;
 
 typedef struct
 {
-    int va, vb, vc;
-    int ta, tb, tc;
-    int na, nb, nc;
+    int va, vb, vc, ta, tb, tc, na, nb, nc;
 }
 Face;
 
@@ -77,22 +75,24 @@ typedef struct
 }
 Input;
 
-static int ulns(FILE* const file)
+static int flns(FILE* const file)
 {
     int ch = EOF;
     int lines = 0;
     int pc = '\n';
     while((ch = getc(file)) != EOF)
     {
-        if(ch == '\n') lines++;
+        if(ch == '\n')
+            lines++;
         pc = ch;
     }
-    if(pc != '\n') lines++;
+    if(pc != '\n')
+        lines++;
     rewind(file);
     return lines;
 }
 
-static char* ureadln(FILE* const file)
+static char* freadln(FILE* const file)
 {
     int ch = EOF;
     int reads = 0;
@@ -122,7 +122,7 @@ static Faces fsnew(const int max)
 
 static Obj oparse(FILE* const file)
 {
-    const int lines = ulns(file);
+    const int lines = flns(file);
     const int size = 128;
     Vertices vsv = vsnew(size);
     Vertices vsn = vsnew(size);
@@ -132,7 +132,7 @@ static Obj oparse(FILE* const file)
     {
         Face f;
         Vertex v;
-        char* line = ureadln(file);
+        char* line = freadln(file);
         if(line[0] == 'v' && line[1] == 'n')
         {
             if(vsn.count == vsn.max)
@@ -279,47 +279,6 @@ static Triangles ttgen(const Obj obj)
     return tt;
 }
 
-static void spresent(const Sdl sdl)
-{
-    SDL_RenderPresent(sdl.renderer);
-}
-
-static void schurn(const Sdl sdl)
-{
-    const SDL_Rect dst = {
-        (sdl.xres - sdl.yres) / 2,
-        (sdl.yres - sdl.xres) / 2,
-        sdl.yres, sdl.xres
-    };
-    SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
-}
-
-static Sdl ssetup(const int xres, const int yres)
-{
-    Sdl sdl;
-    SDL_Init(SDL_INIT_VIDEO);
-    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
-    sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
-    // Notice the flip between xres and yres - the renderer is on its side to maximize cache effeciency.
-    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
-    sdl.xres = xres;
-    sdl.yres = yres;
-    return sdl;
-}
-
-static void sunlock(const Sdl sdl)
-{
-    SDL_UnlockTexture(sdl.canvas);
-}
-
-static uint32_t* slock(const Sdl sdl)
-{
-    void* pixel;
-    int pitch;
-    SDL_LockTexture(sdl.canvas, NULL, &pixel, &pitch);
-    return (uint32_t*) pixel;
-}
-
 static Triangle tviewport(const Triangle t, const Sdl sdl)
 {
     const float w = sdl.yres / 1.5f;
@@ -334,7 +293,7 @@ static Triangle tviewport(const Triangle t, const Sdl sdl)
     return v;
 }
 
-static Triangle tpersp(const Triangle t)
+static Triangle tperspective(const Triangle t)
 {
     const float c = 3.0f;
     const float za = 1.0f - t.a.z / c;
@@ -448,6 +407,58 @@ static void reset(float* const zbuff, uint32_t* const pixel, const int size)
         zbuff[i] = -FLT_MAX, pixel[i] = 0x0;
 }
 
+static void spresent(const Sdl sdl)
+{
+    SDL_RenderPresent(sdl.renderer);
+}
+
+static void schurn(const Sdl sdl)
+{
+    const SDL_Rect dst = {
+        (sdl.xres - sdl.yres) / 2,
+        (sdl.yres - sdl.xres) / 2,
+        sdl.yres, sdl.xres
+    };
+    SDL_RenderCopyEx(sdl.renderer, sdl.canvas, NULL, &dst, -90, NULL, SDL_FLIP_NONE);
+}
+
+static Sdl ssetup(const int xres, const int yres)
+{
+    Sdl sdl;
+    SDL_Init(SDL_INIT_VIDEO);
+    sdl.window = SDL_CreateWindow("water", 0, 0, xres, yres, SDL_WINDOW_SHOWN);
+    sdl.renderer = SDL_CreateRenderer(sdl.window, -1, SDL_RENDERER_ACCELERATED);
+    // Notice the flip between xres and yres - the renderer is on its side to maximize cache effeciency.
+    sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
+    sdl.xres = xres;
+    sdl.yres = yres;
+    return sdl;
+}
+
+static void sunlock(const Sdl sdl)
+{
+    SDL_UnlockTexture(sdl.canvas);
+}
+
+static uint32_t* slock(const Sdl sdl)
+{
+    void* pixel;
+    int pitch;
+    SDL_LockTexture(sdl.canvas, NULL, &pixel, &pitch);
+    return (uint32_t*) pixel;
+}
+
+static FILE* oload(const char* const path)
+{
+    FILE* const file = fopen(path, "r");
+    if(file == NULL)
+    {
+        printf("could not open %s\n", path);
+        exit(1);
+    }
+    return file;
+}
+
 static SDL_Surface* sload(const char* const path)
 {
     SDL_Surface* const bmp = SDL_LoadBMP(path);
@@ -463,46 +474,35 @@ static SDL_Surface* sload(const char* const path)
     return converted;
 }
 
-static FILE* oload(const char* const path)
-{
-    FILE* const file = fopen(path, "r");
-    if(file == NULL)
-    {
-        printf("could not open %s\n", path);
-        exit(1);
-    }
-    return file;
-}
-
 int main()
 {
     FILE* const fobj = oload("model/salesman.obj");
     SDL_Surface* const fdif = sload("model/salesman.bmp");
     const Obj obj = oparse(fobj);
-    const Triangles tv = tvgen(obj);
-    const Triangles tt = ttgen(obj);
-    const Triangles tn = tngen(obj);
+    const Triangles tv = tvgen(obj); // Triangle Vertices.
+    const Triangles tt = ttgen(obj); // Triangle Textures.
+    const Triangles tn = tngen(obj); // Triangle Normals.
     const Sdl sdl = ssetup(800, 600);
     float* const zbuff = (float*) malloc(sizeof(float) * sdl.xres * sdl.yres);
     for(Input input = iinit(); !input.key[SDL_SCANCODE_END]; input = ipump(input))
     {
         uint32_t* const pixel = slock(sdl);
         reset(zbuff, pixel, sdl.xres * sdl.yres);
-        const Vertex ctr = { 0.0f, 0.0f, 0.0f };
-        const Vertex ups = { 0.0f, 1.0f, 0.0f };
+        const Vertex center = { 0.0f, 0.0f, 0.0f };
+        const Vertex upward = { 0.0f, 1.0f, 0.0f };
         const Vertex eye = { sinf(input.xt), sinf(input.yt), cosf(input.xt) };
-        const Vertex z = vunit(vsub(eye, ctr));
-        const Vertex x = vunit(vcross(ups, z));
+        const Vertex z = vunit(vsub(eye, center));
+        const Vertex x = vunit(vcross(upward, z));
         const Vertex y = vcross(z, x);
         for(int i = 0; i < tv.count; i++)
         {
             const Triangle nrm = tviewnrm(tn.triangle[i], x, y, z);
             const Triangle tex = tt.triangle[i];
             const Triangle tri = tviewtri(tv.triangle[i], x, y, z, eye);
-            const Triangle per = tpersp(tri);
+            const Triangle per = tperspective(tri);
             const Triangle vew = tviewport(per, sdl);
-            const Target targ = { vew, nrm, tex, fdif };
-            tdraw(sdl.yres, pixel, zbuff, targ);
+            const Target target = { vew, nrm, tex, fdif };
+            tdraw(sdl.yres, pixel, zbuff, target);
         }
         sunlock(sdl);
         schurn(sdl);
