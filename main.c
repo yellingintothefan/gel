@@ -351,7 +351,7 @@ static void tdraw(const int yres, uint32_t* const pixel, float* const zbuff, con
         const Vertex bc = tbarycenter(t.vew, x, y);
         if(bc.x >= 0.0f && bc.y >= 0.0f && bc.z >= 0.0f)
         {
-            // Barycenter above is upwards. Everything below rotated 90 degrees to accomodate sideways renderer.
+            // Barycenter above is upwards. Everything below rotated 90 degrees to accommodate sideways renderer.
             const float z = bc.x * t.vew.b.z + bc.y * t.vew.c.z + bc.z * t.vew.a.z;
             if(z > zbuff[y + x * yres])
             {
@@ -437,7 +437,7 @@ static Sdl ssetup(const int xres, const int yres)
     SDL_Init(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer(xres, yres, 0, &sdl.window, &sdl.renderer);
     SDL_SetWindowTitle(sdl.window, "Gel-1.2");
-    // Notice the flip between xres and yres - the renderer is on its side to maximize cache effeciency.
+    // Notice the flip between xres and yres - the renderer is on its side to maximize cache efficiency.
     sdl.canvas = SDL_CreateTexture(sdl.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, yres, xres);
     sdl.xres = xres;
     sdl.yres = yres;
